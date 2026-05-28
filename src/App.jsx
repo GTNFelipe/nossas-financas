@@ -13,6 +13,7 @@ import {
   Check,
   Clock,
   Trash2,
+  Edit,
   SlidersHorizontal,
   RefreshCw,
   Info,
@@ -45,6 +46,7 @@ export default function App() {
   })
   const [activeTab, setActiveTab] = useState('dashboard') // 'dashboard' | 'lancamentos' | 'metas'
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingTransactionId, setEditingTransactionId] = useState(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [dbStatus, setDbStatus] = useState('local') // 'local' | 'supabase_connected' | 'supabase_error'
 
@@ -210,8 +212,21 @@ export default function App() {
     }
   }
 
-  // --- Função para Adicionar Transação ---
-  const handleAddTransaction = async (e) => {
+  // --- Função para Iniciar Edição de Transação ---
+  const startEditTransaction = (tx) => {
+    setEditingTransactionId(tx.id)
+    setFormValor(tx.valor.toString().replace('.', ','))
+    setFormTipo(tx.tipo)
+    setFormCategoria(tx.categoria)
+    setFormSubcategoria(tx.subcategoria)
+    setFormQuemPagou(tx.quem_pagou)
+    setFormStatus(tx.status)
+    setFormDataReferencia(tx.data_referencia)
+    setIsModalOpen(true)
+  }
+
+  // --- Função para Adicionar ou Editar Transação ---
+  const handleSaveTransaction = async (e) => {
     e.preventDefault()
     const valorNum = parseBRL(formValor)
     if (isNaN(valorNum) || valorNum <= 0) {
@@ -219,8 +234,7 @@ export default function App() {
       return
     }
 
-    const newTx = {
-      criado_em: new Date().toISOString(),
+    const txData = {
       data_referencia: formDataReferencia,
       tipo: formTipo,
       categoria: formCategoria,
@@ -230,34 +244,71 @@ export default function App() {
       status: formStatus
     }
 
-    if (isSupabaseConfigured && dbStatus === 'supabase_connected') {
-      setIsSyncing(true)
-      try {
-        const { data, error } = await supabase
-          .from('transacoes')
-          .insert([newTx])
-          .select()
+    if (editingTransactionId) {
+      // Modo Edição
+      if (isSupabaseConfigured && dbStatus === 'supabase_connected') {
+        setIsSyncing(true)
+        try {
+          const { data, error } = await supabase
+            .from('transacoes')
+            .update(txData)
+            .eq('id', editingTransactionId)
+            .select()
 
-        if (error) throw error
+          if (error) throw error
 
-        if (data && data.length > 0) {
-          setTransactions(prev => [data[0], ...prev])
-        } else {
-          // Fallback se não retornou o objeto criado
-          loadData()
+          if (data && data.length > 0) {
+            setTransactions(prev => prev.map(t => t.id === editingTransactionId ? data[0] : t))
+          } else {
+            loadData()
+          }
+          alert("Lançamento atualizado com sucesso!")
+        } catch (err) {
+          console.error("Erro ao atualizar no Supabase, atualizando localmente:", err.message)
+          alert("Erro no Supabase. Lançamento atualizado localmente.")
+          updateTxLocal(editingTransactionId, txData)
+        } finally {
+          setIsSyncing(false)
         }
-      } catch (err) {
-        console.error("Erro ao salvar no Supabase, gravando localmente:", err.message)
-        alert("Erro ao conectar com o Supabase. Transação salva localmente no navegador.")
-        saveTxLocal(newTx)
-      } finally {
-        setIsSyncing(false)
+      } else {
+        updateTxLocal(editingTransactionId, txData)
+        alert("Lançamento atualizado localmente!")
       }
     } else {
-      saveTxLocal(newTx)
+      // Modo Criação
+      const newTx = {
+        ...txData,
+        criado_em: new Date().toISOString()
+      }
+      if (isSupabaseConfigured && dbStatus === 'supabase_connected') {
+        setIsSyncing(true)
+        try {
+          const { data, error } = await supabase
+            .from('transacoes')
+            .insert([newTx])
+            .select()
+
+          if (error) throw error
+
+          if (data && data.length > 0) {
+            setTransactions(prev => [data[0], ...prev])
+          } else {
+            loadData()
+          }
+        } catch (err) {
+          console.error("Erro ao salvar no Supabase, gravando localmente:", err.message)
+          alert("Erro ao conectar com o Supabase. Transação salva localmente no navegador.")
+          saveTxLocal(newTx)
+        } finally {
+          setIsSyncing(false)
+        }
+      } else {
+        saveTxLocal(newTx)
+      }
     }
 
     // Resetar Formulário
+    setEditingTransactionId(null)
     setFormValor('')
     setFormSubcategoria('')
     const today = new Date()
@@ -271,6 +322,12 @@ export default function App() {
   const saveTxLocal = (newTx) => {
     const localTx = { ...newTx, id: 'tx-' + Date.now() }
     const updated = [localTx, ...transactions]
+    setTransactions(updated)
+    localStorage.setItem('financas_transactions', JSON.stringify(updated))
+  }
+
+  const updateTxLocal = (id, txData) => {
+    const updated = transactions.map(t => t.id === id ? { ...t, ...txData } : t)
     setTransactions(updated)
     localStorage.setItem('financas_transactions', JSON.stringify(updated))
   }
@@ -790,7 +847,12 @@ export default function App() {
                   )}
                 </select>
                 <button
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={() => {
+                    setEditingTransactionId(null)
+                    setFormValor('')
+                    setFormSubcategoria('')
+                    setIsModalOpen(true)
+                  }}
                   className="btn-primary"
                 >
                   <Plus className="h-5 w-5" />
@@ -1153,13 +1215,22 @@ export default function App() {
                             </span>
                           </td>
                           <td className="p-4 text-center">
-                            <button
-                              onClick={() => handleDeleteTransaction(tx.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all active:scale-90"
-                              title="Excluir Lançamento"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => startEditTransaction(tx)}
+                                className="p-1.5 text-slate-400 hover:text-pink-650 dark:hover:text-amber-400 rounded-lg hover:bg-pink-100/60 dark:hover:bg-slate-800 transition-all active:scale-90"
+                                title="Editar Lançamento"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTransaction(tx.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all active:scale-90"
+                                title="Excluir Lançamento"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1187,7 +1258,12 @@ export default function App() {
                 <p className="text-sm text-slate-500">Adicione novos registros ou audite a lista completa de despesas e receitas</p>
               </div>
               <button
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => {
+                  setEditingTransactionId(null)
+                  setFormValor('')
+                  setFormSubcategoria('')
+                  setIsModalOpen(true)
+                }}
                 className="btn-primary w-full sm:w-auto"
               >
                 <Plus className="h-5 w-5" />
@@ -1298,12 +1374,22 @@ export default function App() {
                             </span>
                           </td>
                           <td className="p-4 text-center">
-                            <button
-                              onClick={() => handleDeleteTransaction(tx.id)}
-                              className="p-1.5 text-slate-450 hover:text-rose-600 dark:hover:text-rose-450 rounded-lg transition-all"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => startEditTransaction(tx)}
+                                className="p-1.5 text-slate-450 hover:text-pink-600 dark:hover:text-amber-400 rounded-lg transition-all"
+                                title="Editar Lançamento"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTransaction(tx.id)}
+                                className="p-1.5 text-slate-450 hover:text-rose-600 dark:hover:text-rose-450 rounded-lg transition-all"
+                                title="Excluir Lançamento"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1406,7 +1492,7 @@ export default function App() {
                           <th className="p-3">Categoria</th>
                           <th className="p-3">Valor da Meta</th>
                           <th className="p-3">Motivo / Descrição</th>
-                          <th className="p-3 text-center">Excluir</th>
+                          <th className="p-3 text-center">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-pink-200/50 dark:divide-slate-800/40 text-sm">
@@ -1423,14 +1509,28 @@ export default function App() {
                                 {meta.descricao || <span className="text-slate-400 dark:text-slate-600">Sem descrição</span>}
                               </td>
                               <td className="p-3 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteMeta(meta.categoria)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded transition-colors"
-                                  title="Excluir Meta"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setFormMetaCategoria(meta.categoria)
+                                      setFormMetaValor(meta.valor_meta.toString().replace('.', ','))
+                                      setFormMetaDescricao(meta.descricao || '')
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-pink-650 dark:hover:text-amber-450 rounded transition-colors"
+                                    title="Editar Meta"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteMeta(meta.categoria)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded transition-colors"
+                                    title="Excluir Meta"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -1785,7 +1885,7 @@ export default function App() {
                       <tr className="bg-pink-200/30 dark:bg-slate-900/60 text-pink-700 dark:text-amber-400 font-bold border-b border-pink-200 dark:border-slate-800">
                         <th className="p-3">Motivo</th>
                         <th className="p-3">Valor Alocado</th>
-                        <th className="p-3 text-center">Excluir</th>
+                        <th className="p-3 text-center">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-pink-200/30 dark:divide-slate-800/40">
@@ -1795,14 +1895,27 @@ export default function App() {
                             <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{p.motivo}</td>
                             <td className="p-3 font-bold text-slate-700 dark:text-slate-350">{formatCurrency(p.valor)}</td>
                             <td className="p-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleDeletePoupancaMotivo(p.motivo)}
-                                className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-450 transition-colors"
-                                title="Excluir Motivo"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormPoupancaMotivoNome(p.motivo)
+                                    setFormPoupancaMotivoValor(p.valor.toString().replace('.', ','))
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-pink-600 dark:hover:text-amber-450 transition-colors"
+                                  title="Editar Motivo"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePoupancaMotivo(p.motivo)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-450 transition-colors"
+                                  title="Excluir Motivo"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
