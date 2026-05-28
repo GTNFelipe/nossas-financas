@@ -965,6 +965,7 @@ export default function App() {
                           fontSize: '13px',
                           fontWeight: 'bold',
                         }}
+                        cursor={theme === 'dark' ? { fill: 'rgba(255, 255, 255, 0.05)' } : { fill: 'rgba(244, 63, 94, 0.05)' }}
                         formatter={(val) => [formatCurrency(val)]}
                       />
                       <Bar dataKey="Receitas" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={36} />
