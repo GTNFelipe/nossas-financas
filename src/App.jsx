@@ -836,30 +836,30 @@ export default function App() {
 
               {/* Card 3: Saldo do Mês */}
               <div className={`glass-panel glass-panel-hover p-6 relative overflow-hidden border-l-4 ${saldoLiquido >= 0
-                  ? 'border-l-green-500'
-                  : 'border-l-red-500'
+                ? 'border-l-green-500'
+                : 'border-l-red-500'
                 }`}>
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Saldo Líquido</p>
                     <h3 className={`text-2xl font-bold mt-2 ${saldoLiquido >= 0
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
                       }`}>
                       {formatCurrency(saldoLiquido)}
                     </h3>
                   </div>
                   <div className={`p-3 rounded-xl shadow-inner ${saldoLiquido >= 0
-                      ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400'
-                      : 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400'
+                    ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400'
+                    : 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400'
                     }`}>
                     <DollarSign className="h-6 w-6" />
                   </div>
                 </div>
                 <div className="mt-4">
                   <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${saldoLiquido >= 0
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                     }`}>
                     {saldoLiquido >= 0 ? 'Superavitário' : 'Déficit no Mês'}
                   </span>
@@ -886,7 +886,7 @@ export default function App() {
                     <SlidersHorizontal className="h-5 w-5" />
                   </button>
                 </div>
-                
+
                 {/* Distribuição dos Motivos */}
                 <div className="mt-4 space-y-1.5">
                   {motivosPoupanca.length > 0 ? (
@@ -915,7 +915,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Efeito decorativo */}
                 <div className="absolute right-0 bottom-0 h-16 w-16 bg-pink-500/5 rounded-full blur-xl translate-x-4 translate-y-4"></div>
               </div>
@@ -965,7 +965,7 @@ export default function App() {
                           fontSize: '13px',
                           fontWeight: 'bold',
                         }}
-                        cursor={theme === 'dark' ? { fill: 'rgba(255, 255, 255, 0.05)' } : { fill: 'rgba(244, 63, 94, 0.05)' }}
+                        cursor={theme === 'dark' ? { fill: 'rgba(0, 0, 0, 0.3)' } : { fill: 'rgba(251, 113, 133, 0.1)' }}
                         formatter={(val) => [formatCurrency(val)]}
                       />
                       <Bar dataKey="Receitas" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={36} />
@@ -1054,8 +1054,8 @@ export default function App() {
                         key={p}
                         onClick={() => setFilterPerson(p)}
                         className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterPerson === p
-                            ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-955 shadow-sm font-bold'
-                            : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-955 shadow-sm font-bold'
+                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
                           }`}
                       >
                         {p}
@@ -1069,8 +1069,8 @@ export default function App() {
                         key={t}
                         onClick={() => setFilterType(t)}
                         className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterType === t
-                            ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-955 shadow-sm font-bold'
-                            : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-955 shadow-sm font-bold'
+                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
                           }`}
                       >
                         {t}
@@ -1113,23 +1113,23 @@ export default function App() {
                           </td>
                           <td className="p-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${tx.quem_pagou === 'Felipe'
-                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-                                : 'bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300'
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                              : 'bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300'
                               }`}>
                               <span className={`h-1.5 w-1.5 rounded-full ${tx.quem_pagou === 'Felipe' ? 'bg-amber-500' : 'bg-pink-500'}`}></span>
                               {tx.quem_pagou}
                             </span>
                           </td>
                           <td className={`p-4 font-bold whitespace-nowrap ${tx.tipo === 'Receita'
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-slate-900 dark:text-white'
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-slate-900 dark:text-white'
                             }`}>
                             {tx.tipo === 'Receita' ? '+' : '-'} {formatCurrency(tx.valor)}
                           </td>
                           <td className="p-4">
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${tx.status === 'Pago'
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400'
-                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400'
                               }`}>
                               {tx.status === 'Pago' ? (
                                 <>
@@ -1211,8 +1211,8 @@ export default function App() {
                         key={p}
                         onClick={() => setFilterPerson(p)}
                         className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterPerson === p
-                            ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-955 shadow-sm font-bold'
-                            : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-955 shadow-sm font-bold'
+                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
                           }`}
                       >
                         {p}
@@ -1227,8 +1227,8 @@ export default function App() {
                         key={t}
                         onClick={() => setFilterType(t)}
                         className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterType === t
-                            ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-955 shadow-sm font-bold'
-                            : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-955 shadow-sm font-bold'
+                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
                           }`}
                       >
                         {t}
@@ -1269,8 +1269,8 @@ export default function App() {
                           <td className="p-4 text-slate-500 dark:text-slate-400">{tx.subcategoria}</td>
                           <td className="p-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${tx.quem_pagou === 'Felipe'
-                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-                                : 'bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300'
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                              : 'bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300'
                               }`}>
                               {tx.quem_pagou}
                             </span>
@@ -1281,8 +1281,8 @@ export default function App() {
                           </td>
                           <td className="p-4">
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${tx.status === 'Pago'
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-450'
-                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-450'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-450'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-450'
                               }`}>
                               {tx.status === 'Pago' ? 'Pago' : 'Pendente'}
                             </span>
@@ -1388,7 +1388,7 @@ export default function App() {
                 {/* Listagem de Metas Ativas */}
                 <div className="mt-8 space-y-3">
                   <h4 className="text-sm font-bold text-slate-700 dark:text-slate-350">Metas Ativas no Momento</h4>
-                  
+
                   <div className="overflow-hidden rounded-xl border border-pink-200 dark:border-slate-800">
                     <table className="w-full text-left border-collapse">
                       <thead>
@@ -1479,8 +1479,8 @@ export default function App() {
                       type="button"
                       onClick={() => setFormTipo('Despesa')}
                       className={`py-2 rounded-lg text-xs font-bold transition-all ${formTipo === 'Despesa'
-                          ? 'bg-rose-500 text-white shadow-md'
-                          : 'text-pink-850 dark:text-slate-400 hover:text-slate-700'
+                        ? 'bg-rose-500 text-white shadow-md'
+                        : 'text-pink-850 dark:text-slate-400 hover:text-slate-700'
                         }`}
                     >
                       Despesa
@@ -1489,8 +1489,8 @@ export default function App() {
                       type="button"
                       onClick={() => setFormTipo('Receita')}
                       className={`py-2 rounded-lg text-xs font-bold transition-all ${formTipo === 'Receita'
-                          ? 'bg-emerald-500 text-white shadow-md'
-                          : 'text-pink-850 dark:text-slate-400 hover:text-slate-700'
+                        ? 'bg-emerald-500 text-white shadow-md'
+                        : 'text-pink-850 dark:text-slate-400 hover:text-slate-700'
                         }`}
                     >
                       Receita
@@ -1574,8 +1574,8 @@ export default function App() {
                     type="button"
                     onClick={() => setFormStatus('Pago')}
                     className={`py-2 rounded-lg text-xs font-semibold transition-all ${formStatus === 'Pago'
-                        ? 'bg-pink-50 dark:bg-slate-700 text-pink-900 dark:text-white shadow-md'
-                        : 'text-pink-850 dark:text-slate-400 hover:text-pink-955'
+                      ? 'bg-pink-50 dark:bg-slate-700 text-pink-900 dark:text-white shadow-md'
+                      : 'text-pink-850 dark:text-slate-400 hover:text-pink-955'
                       }`}
                   >
                     Pago
@@ -1584,8 +1584,8 @@ export default function App() {
                     type="button"
                     onClick={() => setFormStatus('Pendente')}
                     className={`py-2 rounded-lg text-xs font-semibold transition-all ${formStatus === 'Pendente'
-                        ? 'bg-pink-50 dark:bg-slate-700 text-pink-900 dark:text-white shadow-md'
-                        : 'text-pink-850 dark:text-slate-400 hover:text-pink-955'
+                      ? 'bg-pink-50 dark:bg-slate-700 text-pink-900 dark:text-white shadow-md'
+                      : 'text-pink-850 dark:text-slate-400 hover:text-pink-955'
                       }`}
                   >
                     Pendente
@@ -1643,7 +1643,7 @@ export default function App() {
 
             {/* Conteúdo rolável */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-800 dark:text-slate-100">
-              
+
               {/* Formulário 1: Saldo Geral */}
               <form onSubmit={handleSavePoupancaTotal} className="space-y-3 p-4 bg-pink-200/20 dark:bg-slate-950/40 rounded-2xl border border-pink-200/50 dark:border-slate-800/40">
                 <h4 className="text-xs font-bold text-pink-900 dark:text-amber-400">1. Saldo Geral Guardado</h4>
@@ -1681,14 +1681,14 @@ export default function App() {
                     {formatCurrency(totalAlocado)} / <span className="text-slate-700 dark:text-slate-350">{formatCurrency(totalGuardado)}</span>
                   </span>
                 </div>
-                
+
                 <div className="w-full bg-pink-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden flex">
                   {motivosPoupanca.map((p, idx) => {
                     const pct = totalGuardado > 0 ? (p.valor / totalGuardado) * 100 : 0
                     const colors = [
-                      'bg-pink-500 dark:bg-amber-500', 
-                      'bg-rose-500 dark:bg-amber-600', 
-                      'bg-emerald-500 dark:bg-slate-600', 
+                      'bg-pink-500 dark:bg-amber-500',
+                      'bg-rose-500 dark:bg-amber-600',
+                      'bg-emerald-500 dark:bg-slate-600',
                       'bg-indigo-500 dark:bg-amber-400'
                     ]
                     const colorClass = colors[idx % colors.length]
@@ -1709,7 +1709,7 @@ export default function App() {
                     ></div>
                   )}
                 </div>
-                
+
                 <div className="flex justify-between text-[10px] text-slate-500 font-semibold italic">
                   <span>{formatCurrency(totalAlocado)} Alocados</span>
                   <span>{formatCurrency(saldoLivre)} Livres (Sem destinação)</span>
@@ -1719,7 +1719,7 @@ export default function App() {
               {/* Formulário 2: Adicionar Motivo */}
               <form onSubmit={handleSavePoupancaMotivo} className="space-y-4 p-4 bg-pink-200/20 dark:bg-slate-955/40 rounded-2xl border border-pink-200/50 dark:border-slate-800/40">
                 <h4 className="text-xs font-bold text-pink-900 dark:text-amber-400">2. Criar / Atualizar Motivo</h4>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">Motivo / Destinação</label>
