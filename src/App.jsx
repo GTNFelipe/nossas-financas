@@ -84,6 +84,7 @@ export default function App() {
   const [formPoupancaTotal, setFormPoupancaTotal] = useState('')
   const [formPoupancaMotivoNome, setFormPoupancaMotivoNome] = useState('')
   const [formPoupancaMotivoValor, setFormPoupancaMotivoValor] = useState('')
+  const [editingPoupancaId, setEditingPoupancaId] = useState(null)
 
   // Categorias válidas fornecidas pelo usuário
   const categoriasValidas = [
@@ -707,14 +708,20 @@ export default function App() {
     if (isSupabaseConfigured && dbStatus === 'supabase_connected') {
       setIsSyncing(true)
       try {
-        const existing = poupancas.find(p => p.motivo.toLowerCase() === motivoNome.toLowerCase())
+        let existing = null
+        if (editingPoupancaId) {
+          existing = poupancas.find(p => p.id === editingPoupancaId)
+        } else {
+          existing = poupancas.find(p => p.motivo.toLowerCase() === motivoNome.toLowerCase())
+        }
+
         if (existing) {
           const { error } = await supabase
             .from('poupancas')
-            .update({ valor: valorNum })
-            .eq('motivo', existing.motivo)
+            .update({ valor: valorNum, motivo: motivoNome })
+            .eq('id', existing.id)
           if (error) throw error
-          setPoupancas(prev => prev.map(p => p.id === existing.id ? { ...p, valor: valorNum } : p))
+          setPoupancas(prev => prev.map(p => p.id === existing.id ? { ...p, valor: valorNum, motivo: motivoNome } : p))
         } else {
           const { data, error } = await supabase
             .from('poupancas')
@@ -730,21 +737,22 @@ export default function App() {
         alert(`Motivo "${motivoNome}" salvo com sucesso!`)
       } catch (err) {
         console.warn("Erro ao salvar motivo de poupança no Supabase, salvando localmente:", err.message)
-        savePoupancaLocal(motivoNome, valorNum)
+        savePoupancaLocal(motivoNome, valorNum, editingPoupancaId)
         alert(`Motivo "${motivoNome}" salvo localmente.`)
       } finally {
         setIsSyncing(false)
       }
     } else {
-      savePoupancaLocal(motivoNome, valorNum)
+      savePoupancaLocal(motivoNome, valorNum, editingPoupancaId)
       alert(`Motivo "${motivoNome}" salvo localmente!`)
     }
     setFormPoupancaMotivoNome('')
     setFormPoupancaMotivoValor('')
+    setEditingPoupancaId(null)
   }
 
-  const handleDeletePoupancaMotivo = async (motivo) => {
-    if (!window.confirm(`Deseja realmente excluir a alocação para "${motivo}"?`)) return
+  const handleDeletePoupancaMotivo = async (p) => {
+    if (!window.confirm(`Deseja realmente excluir a alocação para "${p.motivo}"?`)) return
 
     if (isSupabaseConfigured && dbStatus === 'supabase_connected') {
       setIsSyncing(true)
@@ -752,28 +760,34 @@ export default function App() {
         const { error } = await supabase
           .from('poupancas')
           .delete()
-          .eq('motivo', motivo)
+          .eq('id', p.id)
         if (error) throw error
-        setPoupancas(prev => prev.filter(p => p.motivo !== motivo))
-        alert(`Alocação para "${motivo}" excluída com sucesso!`)
+        setPoupancas(prev => prev.filter(item => item.id !== p.id))
+        alert(`Alocação para "${p.motivo}" excluída com sucesso!`)
       } catch (err) {
         console.warn("Erro ao excluir do Supabase, excluindo localmente:", err.message)
-        deletePoupancaLocal(motivo)
-        alert(`Alocação para "${motivo}" excluída localmente.`)
+        deletePoupancaLocal(p.id)
+        alert(`Alocação para "${p.motivo}" excluída localmente.`)
       } finally {
         setIsSyncing(false)
       }
     } else {
-      deletePoupancaLocal(motivo)
-      alert(`Alocação para "${motivo}" excluída localmente!`)
+      deletePoupancaLocal(p.id)
+      alert(`Alocação para "${p.motivo}" excluída localmente!`)
     }
   }
 
-  const savePoupancaLocal = (motivo, valor) => {
+  const savePoupancaLocal = (motivo, valor, id = null) => {
     let updated
-    const existing = poupancas.find(p => p.motivo.toLowerCase() === motivo.toLowerCase())
+    let existing = null
+    if (id) {
+      existing = poupancas.find(p => p.id === id)
+    } else {
+      existing = poupancas.find(p => p.motivo.toLowerCase() === motivo.toLowerCase())
+    }
+
     if (existing) {
-      updated = poupancas.map(p => p.motivo.toLowerCase() === motivo.toLowerCase() ? { ...p, valor } : p)
+      updated = poupancas.map(p => p.id === existing.id ? { ...p, valor, motivo } : p)
     } else {
       updated = [...poupancas, { id: 'poup-' + Date.now(), motivo, valor }]
     }
@@ -781,8 +795,8 @@ export default function App() {
     localStorage.setItem('financas_poupanca', JSON.stringify(updated))
   }
 
-  const deletePoupancaLocal = (motivo) => {
-    const updated = poupancas.filter(p => p.motivo !== motivo)
+  const deletePoupancaLocal = (id) => {
+    const updated = poupancas.filter(p => p.id !== id)
     setPoupancas(updated)
     localStorage.setItem('financas_poupanca', JSON.stringify(updated))
   }
@@ -806,6 +820,17 @@ export default function App() {
   const totalDespesa = activeMonthTransactions
     .filter(t => t.tipo === 'Despesa')
     .reduce((sum, t) => sum + t.valor, 0)
+
+  // Reserva de Emergência Inteligência
+  const cleanMotivo = (name) => {
+    if (!name) return ''
+    return name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+  }
+  const reservaEmergenciaItem = motivosPoupanca.find(p => cleanMotivo(p.motivo) === 'reserva de emergencia')
+  const valorAtualReserva = reservaEmergenciaItem ? reservaEmergenciaItem.valor : 0
+  const metaReservaEmergencia = totalDespesa * 6
+  const quantoFalta = Math.max(0, metaReservaEmergencia - valorAtualReserva)
+  const porcentagemReserva = metaReservaEmergencia > 0 ? Math.min(100, (valorAtualReserva / metaReservaEmergencia) * 100) : 0
 
   // 3. Saldo do Mês
   const saldoLiquido = totalReceita - totalDespesa
@@ -1309,6 +1334,36 @@ export default function App() {
                       )}
                     </div>
                   </div>
+
+                  {/* Reserva de Emergência Inteligência */}
+                  {reservaEmergenciaItem ? (
+                    <div className="mt-4 p-3.5 bg-pink-100/20 dark:bg-slate-950/40 rounded-2xl border border-pink-200/40 dark:border-slate-800/40 space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-pink-900 dark:text-amber-400 flex items-center gap-1.5">
+                          <Target className="h-3.5 w-3.5 text-pink-600 dark:text-amber-400" />
+                          Reserva de Emergência
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-450 font-bold">
+                          {porcentagemReserva.toFixed(0)}% • {quantoFalta > 0 ? `Faltam ${formatCurrency(quantoFalta)}` : 'Atingida!'}
+                        </span>
+                      </div>
+                      <div className="w-full bg-pink-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-pink-500 to-rose-500 dark:from-amber-400 dark:to-amber-500 transition-all duration-500"
+                          style={{ width: `${porcentagemReserva}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-[10px] text-slate-550 dark:text-slate-450 leading-tight">
+                        Sua meta de 6 meses de custo de vida é <span className="font-bold text-slate-700 dark:text-slate-350">{formatCurrency(metaReservaEmergencia)}</span>. Você já tem <span className="font-bold text-slate-700 dark:text-slate-350">{formatCurrency(valorAtualReserva)}</span> guardados.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 p-3 bg-pink-100/10 dark:bg-slate-950/20 rounded-2xl border border-dashed border-pink-200/60 dark:border-slate-800/60 text-center">
+                      <p className="text-[10px] text-slate-500 dark:text-slate-405 leading-normal">
+                        Crie uma alocação com o nome exatamente <strong className="text-pink-900 dark:text-amber-400 font-bold">"Reserva de Emergência"</strong> para ativar a meta inteligente de 6 meses de custo de vida.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-6 border-t border-pink-200 dark:border-amber-500/20 pt-4 flex justify-between items-center text-xs">
@@ -2000,7 +2055,12 @@ export default function App() {
                 </div>
               </div>
               <button
-                onClick={() => setIsPoupancaModalOpen(false)}
+                onClick={() => {
+                  setEditingPoupancaId(null)
+                  setFormPoupancaMotivoNome('')
+                  setFormPoupancaMotivoValor('')
+                  setIsPoupancaModalOpen(false)
+                }}
                 className="text-white/80 hover:text-white text-sm font-bold bg-white/15 hover:bg-white/20 px-2.5 py-1 rounded-lg transition-all"
               >
                 Fechar
@@ -2122,13 +2182,28 @@ export default function App() {
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  className="btn-primary w-full h-[38px] py-0 flex items-center justify-center gap-1.5 text-xs bg-gradient-to-r from-pink-600 to-rose-600 dark:from-amber-500 dark:to-amber-600 dark:text-slate-950"
-                >
-                  <Plus className="h-4 w-4" />
-                  Salvar Motivo / Alocação
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="btn-primary flex-1 h-[38px] py-0 flex items-center justify-center gap-1.5 text-xs bg-gradient-to-r from-pink-600 to-rose-600 dark:from-amber-500 dark:to-amber-600 dark:text-slate-950"
+                  >
+                    {editingPoupancaId ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    {editingPoupancaId ? 'Atualizar Motivo' : 'Salvar Motivo / Alocação'}
+                  </button>
+                  {editingPoupancaId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormPoupancaMotivoNome('')
+                        setFormPoupancaMotivoValor('')
+                        setEditingPoupancaId(null)
+                      }}
+                      className="btn-secondary h-[38px] px-3 text-xs"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
               </form>
 
               {/* Lista de Motivos Ativos */}
@@ -2154,6 +2229,7 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    setEditingPoupancaId(p.id)
                                     setFormPoupancaMotivoNome(p.motivo)
                                     setFormPoupancaMotivoValor(p.valor.toString().replace('.', ','))
                                   }}
@@ -2164,7 +2240,7 @@ export default function App() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleDeletePoupancaMotivo(p.motivo)}
+                                  onClick={() => handleDeletePoupancaMotivo(p)}
                                   className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-450 transition-colors"
                                   title="Excluir Motivo"
                                 >
