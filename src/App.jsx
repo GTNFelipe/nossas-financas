@@ -63,6 +63,7 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState(getTodayMonthStr)
   const [filterPerson, setFilterPerson] = useState('Todos')
   const [filterType, setFilterType] = useState('Todos')
+  const [filterStatus, setFilterStatus] = useState('Todos')
 
   // --- Estados do Formulário de Lançamento ---
   const [formValor, setFormValor] = useState('')
@@ -925,7 +926,8 @@ export default function App() {
   const filteredTransactions = activeMonthTransactions.filter(t => {
     const matchPerson = filterPerson === 'Todos' || t.quem_pagou === filterPerson
     const matchType = filterType === 'Todos' || t.tipo === filterType
-    return matchPerson && matchType
+    const matchStatus = filterStatus === 'Todos' || t.status === filterStatus
+    return matchPerson && matchType && matchStatus
   })
 
   // Módulos de meses únicos para filtros
@@ -1553,8 +1555,20 @@ export default function App() {
                   <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-4">Resumo do Mês</h3>
                   <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
                     {categoryChartData.length > 0 ? (
-                      categoryChartData.map(c => {
-                        const net = c.Receitas - c.Despesas
+                      [...categoryChartData]
+                        .sort((a, b) => {
+                          const hasReceitasA = a.Receitas > 0
+                          const hasReceitasB = b.Receitas > 0
+                          if (hasReceitasA && !hasReceitasB) return -1
+                          if (!hasReceitasA && hasReceitasB) return 1
+                          if (hasReceitasA && hasReceitasB) {
+                            return b.Receitas - a.Receitas
+                          } else {
+                            return b.Despesas - a.Despesas
+                          }
+                        })
+                        .map(c => {
+                          const net = c.Receitas - c.Despesas
                         return (
                           <div key={c.name} className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/30 dark:border-slate-850/30 space-y-1.5">
                             <div className="flex justify-between items-center text-sm font-semibold">
@@ -1783,6 +1797,21 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+
+                  <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs">
+                    {['Todos', 'Pago', 'Pendente'].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setFilterStatus(s)}
+                        className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${filterStatus === s
+                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
+                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                          }`}
+                      >
+                        {s === 'Todos' ? 'Todos' : s === 'Pago' ? 'Pagas' : 'Pendentes'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1972,6 +2001,22 @@ export default function App() {
                           }`}
                       >
                         {t}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs">
+                    {['Todos', 'Pago', 'Pendente'].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setFilterStatus(s)}
+                        className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${filterStatus === s
+                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
+                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                          }`}
+                      >
+                        {s === 'Todos' ? 'Todos' : s === 'Pago' ? 'Pagas' : 'Pendentes'}
                       </button>
                     ))}
                   </div>
