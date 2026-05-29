@@ -28,7 +28,10 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend
+  Legend,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts'
 import { supabase, isSupabaseConfigured } from './supabaseClient'
 import { initialTransactions, initialMetas, initialPoupanca } from './mockData'
@@ -49,6 +52,7 @@ export default function App() {
   const [editingTransactionId, setEditingTransactionId] = useState(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [dbStatus, setDbStatus] = useState('local') // 'local' | 'supabase_connected' | 'supabase_error'
+  const [categoryChartType, setCategoryChartType] = useState('Despesa') // 'Despesa' | 'Receita'
 
   // --- Estados de Filtro ---
   const getTodayMonthStr = () => {
@@ -835,6 +839,17 @@ export default function App() {
   // 3. Saldo do Mês
   const saldoLiquido = totalReceita - totalDespesa
 
+  // 4. Dinheiro em Conta (Saldo Pago Acumulado de Todo o Histórico)
+  const dinheiroEmConta = transactions
+    .filter(t => t.status === 'Pago')
+    .reduce((sum, t) => {
+      if (t.tipo === 'Receita') {
+        return sum + t.valor
+      } else {
+        return sum - t.valor
+      }
+    }, 0)
+
   // Formatação de Data DD/MM/AAAA
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -907,6 +922,51 @@ export default function App() {
   }
 
   const chartData = getChartData()
+
+  // --- Formatação para o Gráfico de Categorias do Mês ---
+  const getCategoryChartData = () => {
+    const categoryMap = {}
+    activeMonthTransactions.forEach(t => {
+      const cat = t.categoria
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = { name: cat, Receitas: 0, Despesas: 0 }
+      }
+      if (t.tipo === 'Receita') {
+        categoryMap[cat].Receitas += t.valor
+      } else if (t.tipo === 'Despesa') {
+        categoryMap[cat].Despesas += t.valor
+      }
+    })
+    // Retorna apenas categorias que tiveram movimento no mês atual
+    return Object.values(categoryMap).filter(item => item.Receitas > 0 || item.Despesas > 0)
+  }
+
+  const categoryChartData = getCategoryChartData()
+
+  // Formata os dados para o gráfico de pizza dependendo do tipo selecionado (Receita / Despesa)
+  const getCategoryPieData = () => {
+    return categoryChartData
+      .filter(c => categoryChartType === 'Receita' ? c.Receitas > 0 : c.Despesas > 0)
+      .map(c => ({
+        name: c.name,
+        value: categoryChartType === 'Receita' ? c.Receitas : c.Despesas
+      }))
+  }
+
+  const categoryPieData = getCategoryPieData()
+
+  const PIE_COLORS = [
+    '#ec4899', // Rosa
+    '#f59e0b', // Âmbar
+    '#10b981', // Esmeralda
+    '#3b82f6', // Azul
+    '#8b5cf6', // Roxo
+    '#f43f5e', // Rose
+    '#06b6d4', // Ciano
+    '#14b8a6', // Teal
+    '#6366f1', // Indigo
+    '#f97316'  // Laranja
+  ]
 
   // Função para converter strings formatadas em pt-BR (ex: "1.234,56" ou "1234,56") para número (float)
   const parseBRL = (valueString) => {
@@ -1086,7 +1146,28 @@ export default function App() {
             {/* --- Cards de Resumo Visual (KPIs) --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-              {/* Card 1: Receita Total */}
+              {/* Card 1: Dinheiro em Conta */}
+              <div className="glass-panel glass-panel-hover p-6 relative overflow-hidden">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Dinheiro em Conta</p>
+                    <h3 className={`text-2xl font-bold mt-2 ${dinheiroEmConta >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {formatCurrency(dinheiroEmConta)}
+                    </h3>
+                  </div>
+                  <div className="p-3 bg-pink-100 dark:bg-slate-800 rounded-xl text-pink-600 dark:text-amber-400 shadow-inner">
+                    <Wallet className="h-6 w-6" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold bg-slate-500/10 px-2 py-1 rounded-md w-fit">
+                  <Check className="h-3 w-3 text-emerald-500" />
+                  Saldo Líquido Pago
+                </div>
+                {/* Efeito decorativo */}
+                <div className="absolute right-0 bottom-0 h-16 w-16 bg-pink-500/5 rounded-full blur-xl translate-x-4 translate-y-4"></div>
+              </div>
+
+              {/* Card 2: Receita Total */}
               <div className="glass-panel glass-panel-hover p-6 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
@@ -1158,32 +1239,6 @@ export default function App() {
                     {saldoLiquido >= 0 ? 'Superavitário' : 'Déficit no Mês'}
                   </span>
                 </div>
-              </div>
-
-              {/* Card 4: Metas (KPI) */}
-              <div className="glass-panel glass-panel-hover p-6 relative overflow-hidden">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Metas do Mês</p>
-                    <h3 className="text-2xl font-bold mt-2 text-slate-900 dark:text-white">
-                      {metas.length} Ativas
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('metas')}
-                    className="p-3 bg-pink-100 hover:bg-pink-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl text-pink-600 dark:text-amber-400 shadow-inner transition-colors"
-                    title="Ajustar Metas"
-                  >
-                    <Target className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  Limite Total: <span className="font-bold text-slate-700 dark:text-slate-300">
-                    {formatCurrency(metas.reduce((sum, m) => sum + m.valor_meta, 0))}
-                  </span>
-                </div>
-                {/* Efeito decorativo */}
-                <div className="absolute right-0 bottom-0 h-16 w-16 bg-pink-500/5 rounded-full blur-xl translate-x-4 translate-y-4"></div>
               </div>
             </div>
 
@@ -1369,6 +1424,118 @@ export default function App() {
                 <div className="mt-6 border-t border-pink-200 dark:border-amber-500/20 pt-4 flex justify-between items-center text-xs">
                   <span className="text-slate-555 dark:text-slate-450 font-medium">Saldo Livre (Sem destinação):</span>
                   <span className="font-bold text-slate-800 dark:text-slate-300">{formatCurrency(saldoLivre)}</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* --- Novo Layout: Gráficos por Categoria --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              {/* Gráfico de Pizza por Categoria */}
+              <div className="glass-panel p-6 lg:col-span-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                  <div>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Distribuição por Categoria</h3>
+                    <p className="text-xs text-slate-500">Divisão percentual de transações por categoria no mês de referência</p>
+                  </div>
+                  <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs self-start sm:self-auto">
+                    <button
+                      onClick={() => setCategoryChartType('Despesa')}
+                      className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${categoryChartType === 'Despesa'
+                        ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
+                        : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                    >
+                      Despesas (Gastos)
+                    </button>
+                    <button
+                      onClick={() => setCategoryChartType('Receita')}
+                      className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${categoryChartType === 'Receita'
+                        ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
+                        : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                    >
+                      Receitas (Entradas)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-[300px] w-full">
+                  {categoryPieData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={categoryPieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={true}
+                          label={({ name, percent }) => `${getCategoryIcon(name)} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          dataKey="value"
+                        >
+                          {categoryPieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: theme === 'dark' ? '#1e293b' : '#fdf2f8',
+                            borderColor: theme === 'dark' ? '#475569' : '#fbcfe8',
+                            color: theme === 'dark' ? '#f8fafc' : '#831843',
+                            borderRadius: '12px',
+                            fontSize: '13px',
+                            fontWeight: 'bold',
+                          }}
+                          formatter={(val) => [formatCurrency(val)]}
+                        />
+                        <Legend
+                          formatter={(value) => <span className="text-xs font-semibold text-slate-700 dark:text-slate-350">{value}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm italic">
+                      Nenhuma {categoryChartType === 'Receita' ? 'receita' : 'despesa'} registrada no mês selecionado.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Detalhamento de Categoria */}
+              <div className="glass-panel p-6 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-4">Resumo do Mês</h3>
+                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                    {categoryChartData.length > 0 ? (
+                      categoryChartData.map(c => {
+                        const net = c.Receitas - c.Despesas
+                        return (
+                          <div key={c.name} className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/30 dark:border-slate-850/30 space-y-1.5">
+                            <div className="flex justify-between items-center text-sm font-semibold">
+                              <span className="text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <span className="text-base">{getCategoryIcon(c.name)}</span>
+                                {c.name}
+                              </span>
+                              <span className={`text-xs font-bold ${net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                {net >= 0 ? '+' : ''}{formatCurrency(net)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs text-slate-550 dark:text-slate-400">
+                              <span>Entradas: {formatCurrency(c.Receitas)}</span>
+                              <span>Saídas: {formatCurrency(c.Despesas)}</span>
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <p className="text-xs text-slate-550 dark:text-slate-400 italic py-4 text-center">Nenhum lançamento no mês selecionado.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-6 border-t border-pink-200 dark:border-amber-500/20 pt-4 flex justify-between items-center text-xs">
+                  <span className="text-slate-555 dark:text-slate-450 font-medium">Categorias Ativas:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-300">{categoryChartData.length}</span>
                 </div>
               </div>
 
@@ -1699,6 +1866,30 @@ export default function App() {
         {/* --- Aba 3: Metas --- */}
         {activeTab === 'metas' && (
           <div className="max-w-2xl mx-auto space-y-6 animate-slide-in">
+
+            {/* Resumo de Metas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="glass-panel p-4 flex items-center justify-between border-l-4 border-l-pink-550 dark:border-l-amber-500">
+                <div>
+                  <span className="text-xs font-semibold text-slate-550 dark:text-slate-450">Metas Ativas</span>
+                  <h4 className="text-lg font-bold text-slate-800 dark:text-slate-200 mt-1">{metas.length} Categoria(s)</h4>
+                </div>
+                <div className="p-2.5 bg-pink-100 dark:bg-slate-800 rounded-xl text-pink-600 dark:text-amber-400 shadow-inner">
+                  <Target className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="glass-panel p-4 flex items-center justify-between border-l-4 border-l-pink-550 dark:border-l-amber-500">
+                <div>
+                  <span className="text-xs font-semibold text-slate-550 dark:text-slate-450">Limite de Gastos Mensal</span>
+                  <h4 className="text-lg font-bold text-slate-800 dark:text-slate-200 mt-1">
+                    {formatCurrency(metas.reduce((sum, m) => sum + m.valor_meta, 0))}
+                  </h4>
+                </div>
+                <div className="p-2.5 bg-pink-100 dark:bg-slate-800 rounded-xl text-pink-600 dark:text-amber-400 shadow-inner">
+                  <DollarSign className="h-5 w-5" />
+                </div>
+              </div>
+            </div>
 
             {/* Card de Configuração de Meta */}
             <div className="glass-panel p-6">
