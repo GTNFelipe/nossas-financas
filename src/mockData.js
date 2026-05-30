@@ -10,6 +10,39 @@ export const initialMetas = [
 export const initialTransactions = [
   // --- MÊS ATUAL: MAIO 2026 ---
   {
+    id: 't_vrva_1',
+    criado_em: '2026-05-01T07:00:00Z',
+    data_referencia: '2026-05-01',
+    tipo: 'Receita',
+    categoria: 'Vale Alimentação/Refeição',
+    subcategoria: 'Carga Mensal Benefício',
+    valor: 1004.00,
+    quem_pagou: 'Felipe',
+    status: 'Pago'
+  },
+  {
+    id: 't_vrva_2',
+    criado_em: '2026-05-03T12:30:00Z',
+    data_referencia: '2026-05-03',
+    tipo: 'Despesa',
+    categoria: 'Vale Alimentação/Refeição',
+    subcategoria: 'Supermercado da Esquina',
+    valor: 150.00,
+    quem_pagou: 'Felipe',
+    status: 'Pago'
+  },
+  {
+    id: 't_vrva_3',
+    criado_em: '2026-05-05T13:15:00Z',
+    data_referencia: '2026-05-05',
+    tipo: 'Despesa',
+    categoria: 'Vale Alimentação/Refeição',
+    subcategoria: 'Almoço Executivo',
+    valor: 45.00,
+    quem_pagou: 'Felipe',
+    status: 'Pago'
+  },
+  {
     id: 't1',
     criado_em: '2026-05-01T08:00:00Z',
     data_referencia: '2026-05',

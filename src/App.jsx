@@ -19,7 +19,8 @@ import {
   RefreshCw,
   Info,
   ChevronRight,
-  TrendingUp as ProfitIcon
+  TrendingUp as ProfitIcon,
+  CreditCard
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -105,7 +106,8 @@ export default function App() {
     'Educação',
     'Imprevistos',
     'Salário',
-    'Renda Extra'
+    'Renda Extra',
+    'Vale Alimentação/Refeição'
   ]
 
   // --- Efeito para Carregar Dados e Aplicar Tema ---
@@ -186,8 +188,55 @@ export default function App() {
     localStorage.setItem('financas_last_checked_month', todayStr)
   }
 
+  // Função para verificar e gerar a recarga mensal automática do Vale Alimentação/Refeição Flexível (R$ 1.004,00)
+  const checkVRVARecharge = async (loadedTxs, isSupabaseActive) => {
+    const currentMonth = getTodayMonthStr() // "YYYY-MM"
+    const hasRecharge = loadedTxs.some(t => 
+      t.categoria === 'Vale Alimentação/Refeição' && 
+      t.tipo === 'Receita' && 
+      t.data_referencia.substring(0, 7) === currentMonth
+    )
+
+    if (!hasRecharge) {
+      const newRecharge = {
+        id: 'tx-vrva-recharge-' + Date.now(),
+        criado_em: new Date().toISOString(),
+        data_referencia: `${currentMonth}-01`,
+        tipo: 'Receita',
+        categoria: 'Vale Alimentação/Refeição',
+        subcategoria: 'Recarga Mensal Automática',
+        valor: 1004.00,
+        quem_pagou: 'Felipe',
+        status: 'Pago'
+      }
+
+      if (isSupabaseActive && isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase
+            .from('transacoes')
+            .insert([newRecharge])
+            .select()
+
+          if (!error && data && data.length > 0) {
+            setTransactions(prev => [data[0], ...prev])
+            return [data[0], ...loadedTxs]
+          }
+        } catch (err) {
+          console.error("Erro ao inserir recarga automatica no Supabase:", err.message)
+        }
+      }
+
+      const updatedTxs = [newRecharge, ...loadedTxs]
+      setTransactions(updatedTxs)
+      localStorage.setItem('financas_transactions', JSON.stringify(updatedTxs))
+      return updatedTxs
+    }
+
+    return loadedTxs
+  }
+
   // Sincronizar dados locais se o Supabase não estiver ativo
-  const loadLocalData = () => {
+  const loadLocalData = async () => {
     const savedTxs = localStorage.getItem('financas_transactions')
     const savedMetas = localStorage.getItem('financas_metas')
     const savedPoupancas = localStorage.getItem('financas_poupanca')
@@ -220,7 +269,9 @@ export default function App() {
     setTransactions(loadedTxs)
     setMetas(loadedMetas)
     setPoupancas(loadedPoupancas)
-    checkMonthTurn(loadedTxs, false)
+    
+    const txsWithRecharge = await checkVRVARecharge(loadedTxs, false)
+    checkMonthTurn(txsWithRecharge, false)
   }
 
   const loadData = async () => {
@@ -263,7 +314,8 @@ export default function App() {
             localStorage.setItem('financas_poupanca', JSON.stringify(initialPoupanca))
           }
         }
-        checkMonthTurn(txData || [], true)
+        const txsWithRecharge = await checkVRVARecharge(txData || [], true)
+        checkMonthTurn(txsWithRecharge, true)
       } catch (err) {
         console.error("Falha ao sincronizar com o Supabase, ativando modo local:", err.message)
         setDbStatus('supabase_error')
@@ -835,14 +887,15 @@ export default function App() {
 
   // --- Cálculos Financeiros ---
   const activeMonthTransactions = transactions.filter(t => t.data_referencia.substring(0, 7) === selectedMonth)
+  const activeMonthCashTransactions = activeMonthTransactions.filter(t => t.categoria !== 'Vale Alimentação/Refeição')
 
   // 1. Receita Total do Mês
-  const totalReceita = activeMonthTransactions
+  const totalReceita = activeMonthCashTransactions
     .filter(t => t.tipo === 'Receita')
     .reduce((sum, t) => sum + t.valor, 0)
 
   // 2. Despesa Total do Mês
-  const totalDespesa = activeMonthTransactions
+  const totalDespesa = activeMonthCashTransactions
     .filter(t => t.tipo === 'Despesa')
     .reduce((sum, t) => sum + t.valor, 0)
 
@@ -862,7 +915,7 @@ export default function App() {
 
   // 4. Dinheiro em Conta (Saldo Pago Acumulado de Todo o Histórico)
   const dinheiroEmConta = transactions
-    .filter(t => t.status === 'Pago')
+    .filter(t => t.status === 'Pago' && t.categoria !== 'Vale Alimentação/Refeição')
     .reduce((sum, t) => {
       if (t.tipo === 'Receita') {
         return sum + t.valor
@@ -872,11 +925,22 @@ export default function App() {
     }, 0)
 
   // 5. Cálculos de Disponibilidade de Saldo (Dinheiro Livre para Gastar)
-  const totalDespesasPendentes = activeMonthTransactions
+  const totalDespesasPendentes = activeMonthCashTransactions
     .filter(t => t.tipo === 'Despesa' && t.status === 'Pendente')
     .reduce((sum, t) => sum + t.valor, 0)
 
   const dinheiroLivre = Math.max(0, dinheiroEmConta - totalDespesasPendentes)
+
+  // --- Cálculos do Vale Alimentação/Refeição Flexível (VA/VR) ---
+  const activeMonthVRVATxs = activeMonthTransactions.filter(t => t.categoria === 'Vale Alimentação/Refeição')
+  const cargaVRVA = activeMonthVRVATxs
+    .filter(t => t.tipo === 'Receita')
+    .reduce((sum, t) => sum + t.valor, 0)
+  const gastoVRVA = activeMonthVRVATxs
+    .filter(t => t.tipo === 'Despesa')
+    .reduce((sum, t) => sum + t.valor, 0)
+  const saldoRestanteVRVA = cargaVRVA - gastoVRVA
+  const pctVRVA = cargaVRVA > 0 ? (gastoVRVA / cargaVRVA) * 100 : 0
 
   const getFreeMoneyData = () => {
     if (dinheiroEmConta >= totalDespesasPendentes) {
@@ -952,7 +1016,7 @@ export default function App() {
       monthsData[m] = { name: m, Receitas: 0, Despesas: 0 }
     })
 
-    transactions.forEach(t => {
+    transactions.filter(t => t.categoria !== 'Vale Alimentação/Refeição').forEach(t => {
       const m = t.data_referencia.substring(0, 7)
       if (monthsData[m]) {
         if (t.tipo === 'Receita') {
@@ -971,7 +1035,7 @@ export default function App() {
   // --- Formatação para o Gráfico de Categorias do Mês ---
   const getCategoryChartData = () => {
     const categoryMap = {}
-    activeMonthTransactions.forEach(t => {
+    activeMonthCashTransactions.forEach(t => {
       const cat = t.categoria
       if (!categoryMap[cat]) {
         categoryMap[cat] = { name: cat, Receitas: 0, Despesas: 0 }
@@ -1046,6 +1110,7 @@ export default function App() {
       case 'Imprevistos': return '⚠️';
       case 'Salário': return '💵';
       case 'Renda Extra': return '💸';
+      case 'Vale Alimentação/Refeição': return '💳';
       default: return '💰';
     }
   }
@@ -1600,7 +1665,7 @@ export default function App() {
 
             </div>
 
-            {/* --- Novo Layout: Dinheiro Livre e Progresso das Metas --- */}
+            {/* --- Novo Layout: Dinheiro Livre, Vale Alimentação/Refeição e Progresso das Metas --- */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
               {/* Card de Dinheiro Livre (Donut Chart) */}
@@ -1648,7 +1713,7 @@ export default function App() {
                           </PieChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="h-full w-full flex items-center justify-center text-xs text-slate-550 italic">
+                        <div className="h-full w-full flex items-center justify-center text-xs text-slate-555 italic">
                           Sem dados
                         </div>
                       )}
@@ -1695,8 +1760,61 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Card de Vale Alimentação/Refeição Flexível (VA/VR) */}
+              <div className="glass-panel p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Alimentação & Refeição</h3>
+                    <div className="p-2.5 bg-orange-100 dark:bg-orange-955/40 rounded-xl text-orange-600 dark:text-orange-450 shadow-inner">
+                      <CreditCard className="h-4.5 w-4.5" />
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <span className="text-xs font-semibold text-slate-500">Saldo Restante Flexível</span>
+                    <h4 className={`text-3xl font-black mt-1 tracking-tight ${saldoRestanteVRVA >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600 dark:text-rose-455'}`}>
+                      {formatCurrency(saldoRestanteVRVA)}
+                    </h4>
+                  </div>
+
+                  {/* Detalhes do Benefício */}
+                  <div className="space-y-4">
+                    {/* Barra de Progresso Gasto */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-705 dark:text-slate-300">Uso do Limite Mensal</span>
+                        <span className="text-slate-500">{pctVRVA.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full bg-orange-50 dark:bg-orange-950/20 h-2.5 rounded-full overflow-hidden border border-orange-100/50 dark:border-orange-900/10">
+                        <div
+                          className="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-550"
+                          style={{ width: `${Math.min(100, pctVRVA)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Info Geral de Gasto vs Recarga */}
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                      <div className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/20 dark:border-slate-850/20">
+                        <span className="text-[10px] text-slate-500 block">Recarregado</span>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatCurrency(cargaVRVA)}</span>
+                      </div>
+                      <div className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/20 dark:border-slate-850/20">
+                        <span className="text-[10px] text-slate-500 block">Gasto Realizado</span>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatCurrency(gastoVRVA)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 border-t border-pink-200 dark:border-amber-500/20 pt-4 flex justify-between items-center text-xs">
+                  <span className="text-slate-555 dark:text-slate-450 font-medium">Recarga automática:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-300">Todo dia 01</span>
+                </div>
+              </div>
+
               {/* Card de Progresso das Metas (Progress Bars) */}
-              <div className="glass-panel p-6 lg:col-span-2 flex flex-col justify-between">
+              <div className="glass-panel p-6 flex flex-col justify-between">
                 <div>
                   <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-1">Acompanhamento do Orçamento</h3>
                   <p className="text-xs text-slate-500 mb-6">Comparação do total gasto real no mês contra os limites (metas) estabelecidos</p>
