@@ -1433,6 +1433,17 @@ export default function App() {
             >
               {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
             </button>
+
+            {/* Botão de Sincronizar */}
+            <button
+              onClick={loadData}
+              disabled={isSyncing}
+              className="p-2.5 rounded-xl bg-pink-200/60 hover:bg-pink-300/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-pink-900 dark:text-slate-300 transition-colors disabled:opacity-50"
+              title="Sincronizar dados com o Supabase"
+              aria-label="Sincronizar"
+            >
+              <RefreshCw className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
       </header>
