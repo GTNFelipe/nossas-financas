@@ -1587,6 +1587,14 @@ export default function App() {
     return matchPerson && matchType && matchStatus && matchCategory
   })
 
+  const filteredReceitas = filteredTransactions
+    .filter(t => t.tipo === 'Receita')
+    .reduce((sum, t) => sum + t.valor, 0)
+
+  const filteredDespesas = filteredTransactions
+    .filter(t => t.tipo === 'Despesa')
+    .reduce((sum, t) => sum + t.valor, 0)
+
   // Módulos de meses únicos para filtros
   const uniqueMonths = [...new Set([getTodayMonthStr(), ...transactions.map(t => t.data_referencia.substring(0, 7))])].sort((a, b) => b.localeCompare(a))
 
@@ -2672,12 +2680,12 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                        className="flex items-center justify-between gap-2.5 bg-pink-50 dark:bg-slate-800 border border-pink-200 dark:border-amber-500/20 rounded-xl py-1.5 px-3 font-semibold text-xs text-pink-900 dark:text-slate-200 outline-none cursor-pointer focus:ring-2 focus:ring-pink-500/20 dark:focus:ring-amber-500/20 hover:bg-pink-100/50 dark:hover:bg-slate-800 transition-all text-left"
+                        className="w-36 flex items-center justify-between gap-2.5 bg-pink-50 dark:bg-slate-800 border border-pink-200 dark:border-amber-500/20 rounded-xl py-1.5 px-3 font-semibold text-xs text-pink-900 dark:text-slate-200 outline-none cursor-pointer focus:ring-2 focus:ring-pink-500/20 dark:focus:ring-amber-500/20 hover:bg-pink-100/50 dark:hover:bg-slate-800 transition-all text-left"
                       >
-                        <span>
+                        <span className="truncate mr-1">
                           {filterCategory === 'Todas' ? '🔍 Todas' : `${getCategoryIcon(filterCategory)} ${filterCategory}`}
                         </span>
-                        <ChevronDown className={`h-4 w-4 text-pink-600 dark:text-amber-400 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`h-4 w-4 text-pink-600 dark:text-amber-400 flex-shrink-0 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
                       </button>
 
                       {isCategoryDropdownOpen && (
@@ -2947,9 +2955,9 @@ export default function App() {
               </button>
             </div>
 
-            {/* Repete a tabela completa com mais destaque */}
+             {/* Repete a tabela completa com mais destaque */}
             <div className="glass-panel p-4 sm:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div className="flex flex-wrap items-center gap-4 mb-6">
                 {/* Seleção do mês */}
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-500">Mês:</span>
@@ -2972,114 +2980,153 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Filtro de pessoas & tipos */}
-                <div className="flex flex-wrap items-center gap-3">
-                  {/* Categoria */}
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-500">Cat:</span>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                        className="flex items-center justify-between gap-2.5 bg-pink-50 dark:bg-slate-800 border border-pink-200 dark:border-amber-500/20 rounded-xl py-1.5 px-3 font-semibold text-xs text-pink-900 dark:text-slate-200 outline-none cursor-pointer focus:ring-2 focus:ring-pink-500/20 dark:focus:ring-amber-500/20 hover:bg-pink-100/50 dark:hover:bg-slate-800 transition-all text-left"
-                      >
-                        <span>
-                          {filterCategory === 'Todas' ? '🔍 Todas' : `${getCategoryIcon(filterCategory)} ${filterCategory}`}
-                        </span>
-                        <ChevronDown className={`h-4 w-4 text-pink-600 dark:text-amber-400 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
+                {/* Categoria */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-500">Cat:</span>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                      className="w-36 flex items-center justify-between gap-2.5 bg-pink-50 dark:bg-slate-800 border border-pink-200 dark:border-amber-500/20 rounded-xl py-1.5 px-3 font-semibold text-xs text-pink-900 dark:text-slate-200 outline-none cursor-pointer focus:ring-2 focus:ring-pink-500/20 dark:focus:ring-amber-500/20 hover:bg-pink-100/50 dark:hover:bg-slate-800 transition-all text-left"
+                    >
+                      <span className="truncate mr-1">
+                        {filterCategory === 'Todas' ? '🔍 Todas' : `${getCategoryIcon(filterCategory)} ${filterCategory}`}
+                      </span>
+                      <ChevronDown className={`h-4 w-4 text-pink-600 dark:text-amber-400 flex-shrink-0 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-                      {isCategoryDropdownOpen && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-20"
-                            onClick={() => setIsCategoryDropdownOpen(false)}
-                          />
-                          <div className="absolute left-0 mt-2 w-52 bg-pink-50/95 dark:bg-slate-900/95 backdrop-blur-md border border-pink-200 dark:border-amber-500/25 rounded-2xl shadow-xl py-1.5 z-30 max-h-60 overflow-y-auto animate-slide-up">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFilterCategory('Todas')
-                                setIsCategoryDropdownOpen(false)
-                              }}
-                              className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${filterCategory === 'Todas'
-                                ? 'bg-pink-200/80 dark:bg-amber-500/25 text-pink-900 dark:text-amber-400 font-bold'
-                                : 'text-pink-950 dark:text-slate-200 hover:bg-pink-200/40 dark:hover:bg-slate-800'
-                                }`}
-                            >
-                              🔍 Todas
-                            </button>
-                            {categoriasValidas.map(cat => {
-                              const isSelected = cat === filterCategory
-                              return (
-                                <button
-                                  key={cat}
-                                  type="button"
-                                  onClick={() => {
-                                    setFilterCategory(cat)
-                                    setIsCategoryDropdownOpen(false)
-                                  }}
-                                  className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${isSelected
-                                    ? 'bg-pink-200/80 dark:bg-amber-500/25 text-pink-900 dark:text-amber-400 font-bold'
-                                    : 'text-pink-950 dark:text-slate-200 hover:bg-pink-200/40 dark:hover:bg-slate-800'
-                                    }`}
-                                >
-                                  {getCategoryIcon(cat)} {cat}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    {isCategoryDropdownOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-20"
+                          onClick={() => setIsCategoryDropdownOpen(false)}
+                        />
+                        <div className="absolute left-0 mt-2 w-52 bg-pink-50/95 dark:bg-slate-900/95 backdrop-blur-md border border-pink-200 dark:border-amber-500/25 rounded-2xl shadow-xl py-1.5 z-30 max-h-60 overflow-y-auto animate-slide-up">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilterCategory('Todas')
+                              setIsCategoryDropdownOpen(false)
+                            }}
+                            className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${filterCategory === 'Todas'
+                              ? 'bg-pink-200/80 dark:bg-amber-500/25 text-pink-900 dark:text-amber-400 font-bold'
+                              : 'text-pink-950 dark:text-slate-200 hover:bg-pink-200/40 dark:hover:bg-slate-800'
+                              }`}
+                          >
+                            🔍 Todas
+                          </button>
+                          {categoriasValidas.map(cat => {
+                            const isSelected = cat === filterCategory
+                            return (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => {
+                                  setFilterCategory(cat)
+                                  setIsCategoryDropdownOpen(false)
+                                }}
+                                className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${isSelected
+                                  ? 'bg-pink-200/80 dark:bg-amber-500/25 text-pink-900 dark:text-amber-400 font-bold'
+                                  : 'text-pink-950 dark:text-slate-200 hover:bg-pink-200/40 dark:hover:bg-slate-800'
+                                  }`}
+                              >
+                                {getCategoryIcon(cat)} {cat}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )}
                   </div>
+                </div>
 
-                  {/* Quem Pagou */}
-                  <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs">
-                    {['Todos', 'Felipe', 'Thaís'].map(p => (
-                      <button
-                        key={p}
-                        onClick={() => setFilterPerson(p)}
-                        className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterPerson === p
-                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
-                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
-                          }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
+                {/* Quem Pagou */}
+                <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs">
+                  {['Todos', 'Felipe', 'Thaís'].map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setFilterPerson(p)}
+                      className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterPerson === p
+                        ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
+                        : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tipo */}
+                <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs">
+                  {['Todos', 'Receita', 'Despesa'].map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setFilterType(t)}
+                      className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterType === t
+                        ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
+                        : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Status */}
+                <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs">
+                  {['Todos', 'Pago', 'Pendente'].map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setFilterStatus(s)}
+                      className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${filterStatus === s
+                        ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
+                        : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                    >
+                      {s === 'Todos' ? 'Todos' : s === 'Pago' ? 'Pagas' : 'Pendentes'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resumo de Totais Filtrados */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                {/* Card Ganhos */}
+                <div className="p-4 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/5 border border-emerald-500/20 dark:border-emerald-500/10 flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500 text-white dark:text-slate-950 rounded-xl">
+                    <TrendingUp className="h-5 w-5" />
                   </div>
-
-                  {/* Tipo */}
-                  <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs">
-                    {['Todos', 'Receita', 'Despesa'].map(t => (
-                      <button
-                        key={t}
-                        onClick={() => setFilterType(t)}
-                        className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterType === t
-                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
-                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
-                          }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Total de Ganhos</span>
+                    <h4 className="text-base font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(filteredReceitas)}</h4>
                   </div>
+                </div>
 
-                  {/* Status */}
-                  <div className="flex bg-pink-200/40 dark:bg-slate-900 p-0.5 rounded-lg border border-pink-200/60 dark:border-amber-500/20 text-xs">
-                    {['Todos', 'Pago', 'Pendente'].map(s => (
-                      <button
-                        key={s}
-                        onClick={() => setFilterStatus(s)}
-                        className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${filterStatus === s
-                          ? 'bg-pink-50 dark:bg-amber-500 text-pink-900 dark:text-slate-950 shadow-sm font-bold'
-                          : 'text-pink-700/70 hover:text-pink-900 dark:text-slate-400 dark:hover:text-slate-200'
-                          }`}
-                      >
-                        {s === 'Todos' ? 'Todos' : s === 'Pago' ? 'Pagas' : 'Pendentes'}
-                      </button>
-                    ))}
+                {/* Card Gastos */}
+                <div className="p-4 rounded-2xl bg-rose-500/10 dark:bg-rose-500/5 border border-rose-500/20 dark:border-rose-500/10 flex items-center gap-3">
+                  <div className="p-2 bg-rose-500 text-white dark:text-slate-950 rounded-xl">
+                    <TrendingDown className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Total de Gastos</span>
+                    <h4 className="text-base font-black text-rose-600 dark:text-rose-400">{formatCurrency(filteredDespesas)}</h4>
+                  </div>
+                </div>
+
+                {/* Card Saldo Filtrado */}
+                <div className={`p-4 rounded-2xl border flex items-center gap-3 ${
+                  (filteredReceitas - filteredDespesas) >= 0
+                    ? 'bg-blue-500/10 dark:bg-blue-500/5 border-blue-500/20 dark:border-blue-500/10 text-blue-600 dark:text-blue-400'
+                    : 'bg-amber-500/10 dark:bg-amber-500/5 border-amber-500/20 dark:border-amber-500/10 text-amber-600 dark:text-amber-400'
+                }`}>
+                  <div className={`p-2 rounded-xl text-white dark:text-slate-950 ${
+                    (filteredReceitas - filteredDespesas) >= 0 ? 'bg-blue-500' : 'bg-amber-500'
+                  }`}>
+                    <Wallet className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Saldo Líquido</span>
+                    <h4 className="text-base font-black">{formatCurrency(filteredReceitas - filteredDespesas)}</h4>
                   </div>
                 </div>
               </div>
