@@ -225,12 +225,20 @@ export default function App() {
     sessionStorage.setItem('financas_last_checked_month', todayStr)
   }
 
-  // Função para realizar a recarga manual do Vale Alimentação/Refeição Flexível (R$ 1.004,00)
+  // Função para realizar a recarga manual do Vale Alimentação/Refeição Flexível
   const handleVRVARecharge = async (month) => {
     const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
     
     if (isSupabaseConfigured && !isSupabaseActive) {
       alert("Operação não permitida: O Supabase não está conectado.")
+      return
+    }
+
+    const inputValor = window.prompt("Confirmar valor da recarga do vale:", "1004.00")
+    if (inputValor === null) return
+    const valorNum = parseFloat(inputValor.replace(',', '.'))
+    if (isNaN(valorNum) || valorNum <= 0) {
+      alert("Por favor, digite um valor válido maior que zero.")
       return
     }
 
@@ -241,7 +249,7 @@ export default function App() {
       tipo: 'Receita',
       categoria: 'Vale Alimentação/Refeição',
       subcategoria: 'Recarga Mensal',
-      valor: 1004.00,
+      valor: valorNum,
       quem_pagou: 'Felipe',
       status: 'Pago'
     }
@@ -301,6 +309,55 @@ export default function App() {
     } catch (err) {
       console.error("Erro ao reverter recarga no Supabase:", err.message)
       alert("Erro ao reverter recarga no Supabase: " + err.message)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  // Função para editar o valor de uma recarga existente do Vale Alimentação/Refeição Flexível
+  const handleEditVRVARecharge = async (month) => {
+    const rechargeTx = transactions.find(t =>
+      t.categoria === 'Vale Alimentação/Refeição' &&
+      t.tipo === 'Receita' &&
+      t.data_referencia.substring(0, 7) === month
+    )
+
+    if (!rechargeTx) return
+
+    const novoValorStr = window.prompt("Ajustar valor da recarga:", rechargeTx.valor)
+    if (novoValorStr === null) return
+
+    const valorNum = parseFloat(novoValorStr.replace(',', '.'))
+    if (isNaN(valorNum) || valorNum <= 0) {
+      alert("Por favor, digite um valor válido maior que zero.")
+      return
+    }
+
+    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
+    if (isSupabaseConfigured && !isSupabaseActive) {
+      alert("Operação não permitida: O Supabase não está conectado.")
+      return
+    }
+
+    setIsSyncing(true)
+    try {
+      if (isSupabaseActive) {
+        const { data, error } = await supabase
+          .from('transacoes')
+          .update({ valor: valorNum })
+          .eq('id', rechargeTx.id)
+          .select()
+
+        if (error) throw error
+        if (data && data.length > 0) {
+          setTransactions(prev => prev.map(t => t.id === rechargeTx.id ? data[0] : t))
+        }
+      } else {
+        setTransactions(prev => prev.map(t => t.id === rechargeTx.id ? { ...t, valor: valorNum } : t))
+      }
+    } catch (err) {
+      console.error("Erro ao atualizar recarga no Supabase:", err.message)
+      alert("Erro ao atualizar recarga no Supabase: " + err.message)
     } finally {
       setIsSyncing(false)
     }
@@ -3201,7 +3258,18 @@ export default function App() {
                     <div className="grid grid-cols-2 gap-2 pt-2">
                       <div className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/20 dark:border-slate-800/20">
                         <span className="text-[10px] text-slate-500 block">Recarregado</span>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatCurrency(cargaVRVA)}</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatCurrency(cargaVRVA)}</span>
+                          {cargaVRVA > 0 && (
+                            <button
+                              onClick={() => handleEditVRVARecharge(selectedMonth)}
+                              className="p-0.5 rounded hover:bg-pink-200/50 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                              title="Editar valor da recarga"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/20 dark:border-slate-800/20">
                         <span className="text-[10px] text-slate-500 block">Gasto Realizado</span>
