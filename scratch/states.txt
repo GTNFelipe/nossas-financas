@@ -1,0 +1,5 @@
+  // --- Estados do Importador de Planilha ---
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importRows, setImportRows] = useState([])
+  const [importFilename, setImportFilename] = useState('')
+  const [importError, setImportError] = useState('')

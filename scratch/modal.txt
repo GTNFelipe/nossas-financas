@@ -1,0 +1,159 @@
+      {/* --- MODAL DE IMPORTAÇÃO DE PLANILHA CSV --- */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div
+            className="w-full max-w-2xl bg-pink-50 dark:bg-slate-900 rounded-3xl shadow-2xl border border-pink-200/60 dark:border-slate-800/50 overflow-hidden animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabeçalho */}
+            <div className="p-6 bg-gradient-to-r from-pink-600 to-rose-600 dark:from-slate-900 dark:to-slate-950 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-white/10 rounded-lg">
+                  <Upload className="h-5 w-5 text-pink-100 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Importar Lançamentos</h3>
+                  <p className="text-[10px] text-pink-200/90 dark:text-slate-400">Importe uma planilha CSV em lote</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setImportRows([])
+                  setImportFilename('')
+                  setImportError('')
+                  setIsImportModalOpen(false)
+                }}
+                className="text-white/85 hover:text-white text-sm font-bold bg-white/15 hover:bg-white/20 px-2.5 py-1 rounded-lg transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="p-4 bg-pink-100/20 dark:bg-slate-950/30 border border-pink-200/40 dark:border-slate-800/40 rounded-2xl text-xs space-y-2">
+                <p className="font-bold text-pink-900 dark:text-amber-400">💡 Como deve ser o arquivo CSV:</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
+                  <li>Exportar a planilha como <strong>CSV separado por vírgulas, ponto e vírgula ou tabulações</strong>.</li>
+                  <li>Funciona com tabelas verticais simples, tabelas múltiplas paralelas ou o formato de planejamento mensal horizontal (meses como colunas).</li>
+                  <li>Formatos de valor suportados: R$ 1.500,00 ou 1500.00.</li>
+                </ul>
+              </div>
+
+              {/* Input do Arquivo */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 block">Selecionar arquivo CSV</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCSVUpload}
+                    className="hidden"
+                    id="csv-file-input"
+                  />
+                  <label
+                    htmlFor="csv-file-input"
+                    className="btn-secondary text-xs py-2 px-4 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Escolher Arquivo
+                  </label>
+                  <span className="text-xs text-slate-600 dark:text-slate-300 italic truncate max-w-[250px]">
+                    {importFilename || 'Nenhum arquivo selecionado'}
+                  </span>
+                </div>
+              </div>
+
+              {importError && (
+                <div className="p-3 bg-red-100/30 border border-red-200/50 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold">
+                  ⚠️ {importError}
+                </div>
+              )}
+
+              {/* Tabela de Preview */}
+              {importRows.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-500">
+                    Pré-visualização dos Lançamentos ({importRows.length} linhas detectadas)
+                  </h4>
+                  <div className="overflow-x-auto border border-pink-200/40 dark:border-slate-800/40 rounded-xl max-h-[220px] overflow-y-auto">
+                    <table className="w-full text-[11px] text-left border-collapse">
+                      <thead>
+                        <tr className="bg-pink-100/30 dark:bg-slate-950/40 border-b border-pink-200/40 dark:border-slate-800/40 font-bold text-slate-700 dark:text-slate-300">
+                          <th className="p-2">Data</th>
+                          <th className="p-2">Tipo</th>
+                          <th className="p-2">Categoria</th>
+                          <th className="p-2">Subcategoria</th>
+                          <th className="p-2">Valor</th>
+                          <th className="p-2">Quem</th>
+                          <th className="p-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-pink-100/20 dark:divide-slate-800/20 text-slate-600 dark:text-slate-300">
+                        {importRows.slice(0, 15).map((row, idx) => (
+                          <tr key={idx} className="hover:bg-pink-100/5 dark:hover:bg-slate-800/30">
+                            <td className="p-2 whitespace-nowrap">{formatDate(row.data_referencia)}</td>
+                            <td className="p-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${row.tipo === 'Receita' ? 'bg-green-100 text-green-800 dark:bg-green-950/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-950/30 dark:text-red-400'}`}>
+                                {row.tipo}
+                              </span>
+                            </td>
+                            <td className="p-2 whitespace-nowrap">{row.categoria}</td>
+                            <td className="p-2 max-w-[120px] truncate" title={row.subcategoria}>{row.subcategoria}</td>
+                            <td className="p-2 font-bold">{formatCurrency(row.valor)}</td>
+                            <td className="p-2">{row.quem_pagou}</td>
+                            <td className="p-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${row.status === 'Pago' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400'}`}>
+                                {row.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {importRows.length > 15 && (
+                    <p className="text-[10px] text-slate-400 italic">
+                      * Exibindo apenas os primeiros 15 lançamentos para pré-visualização.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Ações */}
+            <div className="p-6 bg-pink-100/10 dark:bg-slate-950/20 border-t border-pink-200/50 dark:border-slate-800/50 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setImportRows([])
+                  setImportFilename('')
+                  setImportError('')
+                  setIsImportModalOpen(false)
+                }}
+                className="btn-secondary text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                disabled={importRows.length === 0 || isSyncing}
+                className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isSyncing ? (
+                  <>
+                    <RefreshCw className="h-4.5 w-4.5 animate-spin" />
+                    Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4.5 w-4.5" />
+                    Confirmar Importação
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}

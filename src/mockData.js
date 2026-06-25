@@ -1,41 +1,8 @@
-// Dados iniciais simulados para a planilha financeira familiar (Felipe & Thaís)
+// Dados iniciais simulados para a planilha financeira familiar (Lucas & Carol)
 
 
 export const initialTransactions = [
   // --- MÊS ATUAL: MAIO 2026 ---
-  {
-    id: 't_vrva_1',
-    criado_em: '2026-05-01T07:00:00Z',
-    data_referencia: '2026-05-01',
-    tipo: 'Receita',
-    categoria: 'Vale Alimentação/Refeição',
-    subcategoria: 'Carga Mensal Benefício',
-    valor: 1004.00,
-    quem_pagou: 'Felipe',
-    status: 'Pago'
-  },
-  {
-    id: 't_vrva_2',
-    criado_em: '2026-05-03T12:30:00Z',
-    data_referencia: '2026-05-03',
-    tipo: 'Despesa',
-    categoria: 'Vale Alimentação/Refeição',
-    subcategoria: 'Supermercado da Esquina',
-    valor: 150.00,
-    quem_pagou: 'Felipe',
-    status: 'Pago'
-  },
-  {
-    id: 't_vrva_3',
-    criado_em: '2026-05-05T13:15:00Z',
-    data_referencia: '2026-05-05',
-    tipo: 'Despesa',
-    categoria: 'Vale Alimentação/Refeição',
-    subcategoria: 'Almoço Executivo',
-    valor: 45.00,
-    quem_pagou: 'Felipe',
-    status: 'Pago'
-  },
   {
     id: 't1',
     criado_em: '2026-05-01T08:00:00Z',
@@ -44,7 +11,7 @@ export const initialTransactions = [
     categoria: 'Investimentos',
     subcategoria: 'Proventos & Salários',
     valor: 7500.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -53,9 +20,9 @@ export const initialTransactions = [
     data_referencia: '2026-05',
     tipo: 'Receita',
     categoria: 'Investimentos',
-    subcategoria: 'Salário Thaís',
+    subcategoria: 'Salário Carol',
     valor: 6800.00,
-    quem_pagou: 'Thaís',
+    quem_pagou: 'Carol',
     status: 'Pago'
   },
   {
@@ -66,7 +33,7 @@ export const initialTransactions = [
     categoria: 'Casa',
     subcategoria: 'Aluguel & Condomínio',
     valor: 2200.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -77,7 +44,7 @@ export const initialTransactions = [
     categoria: 'Dízimo',
     subcategoria: 'Contribuição Mensal',
     valor: 1430.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -88,7 +55,7 @@ export const initialTransactions = [
     categoria: 'Saúde',
     subcategoria: 'Plano de Saúde',
     valor: 450.00,
-    quem_pagou: 'Thaís',
+    quem_pagou: 'Carol',
     status: 'Pago'
   },
   {
@@ -99,7 +66,7 @@ export const initialTransactions = [
     categoria: 'Lazer',
     subcategoria: 'Jantar Restaurante',
     valor: 280.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -110,7 +77,7 @@ export const initialTransactions = [
     categoria: 'Transporte',
     subcategoria: 'Combustível',
     valor: 180.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -121,7 +88,7 @@ export const initialTransactions = [
     categoria: 'Lazer',
     subcategoria: 'Cinema & Pipoca',
     valor: 110.00,
-    quem_pagou: 'Thaís',
+    quem_pagou: 'Carol',
     status: 'Pago'
   },
   {
@@ -132,7 +99,7 @@ export const initialTransactions = [
     categoria: 'Despesas Pessoais',
     subcategoria: 'Compras Online',
     valor: 350.00,
-    quem_pagou: 'Thaís',
+    quem_pagou: 'Carol',
     status: 'Pago'
   },
   {
@@ -143,7 +110,7 @@ export const initialTransactions = [
     categoria: 'Lazer',
     subcategoria: 'Viagem de Fim de Semana',
     valor: 300.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pendente' // ainda pendente para demonstrar visualmente
   },
   {
@@ -154,7 +121,7 @@ export const initialTransactions = [
     categoria: 'Cartão de Crédito',
     subcategoria: 'Assinatura Netflix',
     valor: 55.90,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -165,7 +132,7 @@ export const initialTransactions = [
     categoria: 'Cartão de Crédito',
     subcategoria: 'Supermercado Carrefour',
     valor: 350.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pendente'
   },
 
@@ -178,7 +145,7 @@ export const initialTransactions = [
     categoria: 'Investimentos',
     subcategoria: 'Salários',
     valor: 14300.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -189,7 +156,7 @@ export const initialTransactions = [
     categoria: 'Casa',
     subcategoria: 'Aluguel/Contas',
     valor: 2400.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -200,7 +167,7 @@ export const initialTransactions = [
     categoria: 'Lazer',
     subcategoria: 'Passeio & Shows',
     valor: 650.00,
-    quem_pagou: 'Thaís',
+    quem_pagou: 'Carol',
     status: 'Pago'
   },
   {
@@ -211,7 +178,7 @@ export const initialTransactions = [
     categoria: 'Investimentos',
     subcategoria: 'Aplicações Renda Fixa',
     valor: 3000.00,
-    quem_pagou: 'Thaís',
+    quem_pagou: 'Carol',
     status: 'Pago'
   },
   {
@@ -222,7 +189,7 @@ export const initialTransactions = [
     categoria: 'Saúde',
     subcategoria: 'Dentista',
     valor: 200.00,
-    quem_pagou: 'Thaís',
+    quem_pagou: 'Carol',
     status: 'Pago'
   },
 
@@ -235,7 +202,7 @@ export const initialTransactions = [
     categoria: 'Investimentos',
     subcategoria: 'Salários',
     valor: 14300.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -246,7 +213,7 @@ export const initialTransactions = [
     categoria: 'Casa',
     subcategoria: 'Aluguel/Contas',
     valor: 2350.00,
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -257,7 +224,7 @@ export const initialTransactions = [
     categoria: 'Lazer',
     subcategoria: 'Show ao Vivo',
     valor: 920.00, // Estourou a meta de lazer do mês anterior para teste visual!
-    quem_pagou: 'Felipe',
+    quem_pagou: 'Lucas',
     status: 'Pago'
   },
   {
@@ -268,7 +235,7 @@ export const initialTransactions = [
     categoria: 'Transporte',
     subcategoria: 'Manutenção Carro',
     valor: 450.00,
-    quem_pagou: 'Thaís',
+    quem_pagou: 'Carol',
     status: 'Pago'
   }
 ]
