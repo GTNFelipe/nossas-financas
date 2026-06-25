@@ -218,50 +218,85 @@ export default function App() {
     sessionStorage.setItem('financas_last_checked_month', todayStr)
   }
 
-  // Função para verificar e gerar a recarga mensal automática do Vale Alimentação/Refeição Flexível (R$ 1.004,00)
-  const checkVRVARecharge = async (loadedTxs, isSupabaseActive) => {
-    const currentMonth = getTodayMonthStr() // "YYYY-MM"
-    const hasRecharge = loadedTxs.some(t =>
-      t.categoria === 'Vale Alimentação/Refeição' &&
-      t.tipo === 'Receita' &&
-      t.data_referencia.substring(0, 7) === currentMonth
-    )
-
-    if (!hasRecharge) {
-      const newRecharge = {
-        id: 'tx-vrva-recharge-' + Date.now(),
-        criado_em: new Date().toISOString(),
-        data_referencia: `${currentMonth}-01`,
-        tipo: 'Receita',
-        categoria: 'Vale Alimentação/Refeição',
-        subcategoria: 'Recarga Mensal Automática',
-        valor: 1004.00,
-        quem_pagou: 'Felipe',
-        status: 'Pago'
-      }
-
-      if (isSupabaseActive && isSupabaseConfigured) {
-        try {
-          const { data, error } = await supabase
-            .from('transacoes')
-            .insert([newRecharge])
-            .select()
-
-          if (!error && data && data.length > 0) {
-            setTransactions(prev => [data[0], ...prev])
-            return [data[0], ...loadedTxs]
-          }
-        } catch (err) {
-          console.error("Erro ao inserir recarga automatica no Supabase:", err.message)
-        }
-      }
-
-      const updatedTxs = [newRecharge, ...loadedTxs]
-      setTransactions(updatedTxs)
-      return updatedTxs
+  // Função para realizar a recarga manual do Vale Alimentação/Refeição Flexível (R$ 1.004,00)
+  const handleVRVARecharge = async (month) => {
+    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
+    
+    if (isSupabaseConfigured && !isSupabaseActive) {
+      alert("Operação não permitida: O Supabase não está conectado.")
+      return
     }
 
-    return loadedTxs
+    const newRecharge = {
+      id: 'tx-vrva-recharge-' + Date.now(),
+      criado_em: new Date().toISOString(),
+      data_referencia: `${month}-01`,
+      tipo: 'Receita',
+      categoria: 'Vale Alimentação/Refeição',
+      subcategoria: 'Recarga Mensal',
+      valor: 1004.00,
+      quem_pagou: 'Felipe',
+      status: 'Pago'
+    }
+
+    setIsSyncing(true)
+    try {
+      if (isSupabaseActive) {
+        const { data, error } = await supabase
+          .from('transacoes')
+          .insert([newRecharge])
+          .select()
+
+        if (error) throw error
+        if (data && data.length > 0) {
+          setTransactions(prev => [data[0], ...prev])
+        } else {
+          setTransactions(prev => [newRecharge, ...prev])
+        }
+      } else {
+        setTransactions(prev => [newRecharge, ...prev])
+      }
+    } catch (err) {
+      console.error("Erro ao inserir recarga no Supabase:", err.message)
+      alert("Erro ao inserir recarga no Supabase: " + err.message)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  // Função para reverter/remover a recarga do Vale Alimentação/Refeição Flexível
+  const handleVRVARevert = async (month) => {
+    const rechargeTx = transactions.find(t =>
+      t.categoria === 'Vale Alimentação/Refeição' &&
+      t.tipo === 'Receita' &&
+      t.data_referencia.substring(0, 7) === month
+    )
+
+    if (!rechargeTx) return
+
+    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
+    if (isSupabaseConfigured && !isSupabaseActive) {
+      alert("Operação não permitida: O Supabase não está conectado.")
+      return
+    }
+
+    setIsSyncing(true)
+    try {
+      if (isSupabaseActive) {
+        const { error } = await supabase
+          .from('transacoes')
+          .delete()
+          .eq('id', rechargeTx.id)
+
+        if (error) throw error
+      }
+      setTransactions(prev => prev.filter(t => t.id !== rechargeTx.id))
+    } catch (err) {
+      console.error("Erro ao reverter recarga no Supabase:", err.message)
+      alert("Erro ao reverter recarga no Supabase: " + err.message)
+    } finally {
+      setIsSyncing(false)
+    }
   }
 
   // Sincronizar dados locais se o Supabase não estiver ativo
@@ -272,8 +307,7 @@ export default function App() {
     setTransactions(loadedTxs)
     setPoupancas(loadedPoupancas)
 
-    const txsWithRecharge = await checkVRVARecharge(loadedTxs, false)
-    checkMonthTurn(txsWithRecharge, false)
+    checkMonthTurn(loadedTxs, false)
   }
 
   async function loadData() {
@@ -303,8 +337,7 @@ export default function App() {
           console.warn("Tabela 'poupancas' nao encontrada no Supabase. Carregando dados iniciais:", pPerr.message)
           setPoupancas(initialPoupanca)
         }
-        const txsWithRecharge = await checkVRVARecharge(txData || [], true)
-        checkMonthTurn(txsWithRecharge, true)
+        checkMonthTurn(txData || [], true)
       } catch (err) {
         console.error("Falha ao sincronizar com o Supabase, ativando modo local:", err.message)
         setDbStatus('supabase_error')
@@ -1503,15 +1536,37 @@ export default function App() {
   const dinheiroLivre = Math.max(0, dinheiroEmConta - totalDespesasPendentes)
 
   // --- Cálculos do Vale Alimentação/Refeição Flexível (VA/VR) ---
+  // Transações do mês ativo
   const activeMonthVRVATxs = activeMonthTransactions.filter(t => t.categoria === 'Vale Alimentação/Refeição')
-  const cargaVRVA = activeMonthVRVATxs
+  const activeMonthCargaVRVA = activeMonthVRVATxs
     .filter(t => t.tipo === 'Receita')
     .reduce((sum, t) => sum + t.valor, 0)
-  const gastoVRVA = activeMonthVRVATxs
+  const activeMonthGastoVRVA = activeMonthVRVATxs
     .filter(t => t.tipo === 'Despesa')
     .reduce((sum, t) => sum + t.valor, 0)
-  const saldoRestanteVRVA = cargaVRVA - gastoVRVA
-  const pctVRVA = cargaVRVA > 0 ? (gastoVRVA / cargaVRVA) * 100 : 0
+
+  // Transações históricas até o mês ativo (inclusive)
+  const allVRVATxsUpToSelectedMonth = transactions.filter(t => 
+    t.categoria === 'Vale Alimentação/Refeição' &&
+    t.data_referencia.substring(0, 7) <= selectedMonth
+  )
+  const cumulativeCargaVRVA = allVRVATxsUpToSelectedMonth
+    .filter(t => t.tipo === 'Receita')
+    .reduce((sum, t) => sum + t.valor, 0)
+  const cumulativeGastoVRVA = allVRVATxsUpToSelectedMonth
+    .filter(t => t.tipo === 'Despesa')
+    .reduce((sum, t) => sum + t.valor, 0)
+
+  // Saldo Restante Flexível é acumulativo de todo o histórico
+  const saldoRestanteVRVA = cumulativeCargaVRVA - cumulativeGastoVRVA
+
+  // Carga e gastos exibidos nos cards são os mensais
+  const cargaVRVA = activeMonthCargaVRVA
+  const gastoVRVA = activeMonthGastoVRVA
+
+  // O percentual de uso representa quanto do saldo recarregado foi gasto, com fallback de 1004.00 caso não haja recarga no mês
+  const limitForPct = activeMonthCargaVRVA > 0 ? activeMonthCargaVRVA : 1004.00
+  const pctVRVA = (activeMonthGastoVRVA / limitForPct) * 100
 
   const getFreeMoneyData = () => {
     if (dinheiroEmConta >= totalDespesasPendentes) {
@@ -2532,22 +2587,22 @@ export default function App() {
                           {formatCurrency(dinheiroLivre).split(',')[0]}
                         </span>
                       </div>
-                      {freeMoneyData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={freeMoneyData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={55}
-                              outerRadius={75}
-                              paddingAngle={3}
-                              dataKey="value"
-                            >
-                              {freeMoneyData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={freeMoneyData.length > 0 ? freeMoneyData : [{ name: 'Sem dados', value: 1, color: theme === 'dark' ? '#334155' : '#e2e8f0' }]}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={75}
+                            paddingAngle={freeMoneyData.length > 0 ? 3 : 0}
+                            dataKey="value"
+                          >
+                            {(freeMoneyData.length > 0 ? freeMoneyData : [{ name: 'Sem dados', value: 1, color: theme === 'dark' ? '#334155' : '#e2e8f0' }]).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          {freeMoneyData.length > 0 && (
                             <Tooltip
                               contentStyle={{
                                 backgroundColor: theme === 'dark' ? '#1e293b' : '#fdf2f8',
@@ -2559,13 +2614,9 @@ export default function App() {
                               }}
                               formatter={(val) => [formatCurrency(val)]}
                             />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-xs text-slate-500 italic">
-                          Sem dados
-                        </div>
-                      )}
+                          )}
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
 
                     {/* Legenda detalhada */}
@@ -2656,9 +2707,35 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="mt-6 border-t border-pink-200 dark:border-amber-500/20 pt-4 flex justify-between items-center text-xs">
-                  <span className="text-slate-500 dark:text-slate-400 font-medium">Recarga automática:</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-300">Todo dia 01</span>
+                <div className="mt-6 border-t border-pink-200 dark:border-amber-500/20 pt-4 flex justify-between items-center text-xs gap-2">
+                  {transactions.some(t =>
+                    t.categoria === 'Vale Alimentação/Refeição' &&
+                    t.tipo === 'Receita' &&
+                    t.data_referencia.substring(0, 7) === selectedMonth
+                  ) ? (
+                    <>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                        <Check className="h-3.5 w-3.5" /> Recarregado
+                      </span>
+                      <button
+                        onClick={() => handleVRVARevert(selectedMonth)}
+                        className="px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-medium transition-colors cursor-pointer border border-rose-200/50 dark:border-rose-900/30 active:scale-95"
+                        title="Reverter a recarga deste mês"
+                      >
+                        Reverter Recarga
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-500 dark:text-slate-400 font-medium">Pendente de recarga:</span>
+                      <button
+                        onClick={() => handleVRVARecharge(selectedMonth)}
+                        className="px-3 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600 dark:text-slate-950 font-bold transition-all shadow-xs shadow-pink-200 cursor-pointer flex items-center gap-1 active:scale-95"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" /> Recarregar R$ 1.004
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
