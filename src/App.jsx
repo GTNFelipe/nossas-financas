@@ -20,8 +20,7 @@ import {
   ChevronDown,
   CreditCard,
   ArrowLeftRight,
-  X,
-  Upload
+  X
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -41,12 +40,6 @@ import { initialTransactions, initialPoupanca } from './mockData'
 
 export default function App() {
   // --- Estados do Aplicativo ---
-  // --- Estados do Importador de Planilha ---
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [importRows, setImportRows] = useState([])
-  const [importFilename, setImportFilename] = useState('')
-  const [importError, setImportError] = useState('')
-
   const [transactions, setTransactions] = useState([])
   const [poupancas, setPoupancas] = useState([])
   const [isPoupancaModalOpen, setIsPoupancaModalOpen] = useState(false)
@@ -225,7 +218,7 @@ export default function App() {
     sessionStorage.setItem('financas_last_checked_month', todayStr)
   }
 
-  // Função para realizar a recarga manual do Vale Alimentação/Refeição Flexível
+  // Função para realizar a recarga manual do Vale Alimentação/Refeição Flexível (R$ 1.004,00)
   const handleVRVARecharge = async (month) => {
     const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
     
@@ -234,22 +227,13 @@ export default function App() {
       return
     }
 
-    const inputValor = window.prompt("Confirmar valor da recarga do vale:", "1004.00")
-    if (inputValor === null) return
-    const valorNum = parseFloat(inputValor.replace(',', '.'))
-    if (isNaN(valorNum) || valorNum <= 0) {
-      alert("Por favor, digite um valor válido maior que zero.")
-      return
-    }
-
-    const newRecharge = {
-      id: 'tx-vrva-recharge-' + Date.now(),
+    const rechargeData = {
       criado_em: new Date().toISOString(),
       data_referencia: `${month}-01`,
       tipo: 'Receita',
       categoria: 'Vale Alimentação/Refeição',
       subcategoria: 'Recarga Mensal',
-      valor: valorNum,
+      valor: 1004.00,
       quem_pagou: 'Felipe',
       status: 'Pago'
     }
@@ -259,17 +243,19 @@ export default function App() {
       if (isSupabaseActive) {
         const { data, error } = await supabase
           .from('transacoes')
-          .insert([newRecharge])
+          .insert([rechargeData])
           .select()
 
         if (error) throw error
         if (data && data.length > 0) {
           setTransactions(prev => [data[0], ...prev])
-        } else {
-          setTransactions(prev => [newRecharge, ...prev])
         }
       } else {
-        setTransactions(prev => [newRecharge, ...prev])
+        const localRecharge = {
+          ...rechargeData,
+          id: Date.now()
+        }
+        setTransactions(prev => [localRecharge, ...prev])
       }
     } catch (err) {
       console.error("Erro ao inserir recarga no Supabase:", err.message)
@@ -313,545 +299,6 @@ export default function App() {
       setIsSyncing(false)
     }
   }
-
-  // Função para editar o valor de uma recarga existente do Vale Alimentação/Refeição Flexível
-  const handleEditVRVARecharge = async (month) => {
-    const rechargeTx = transactions.find(t =>
-      t.categoria === 'Vale Alimentação/Refeição' &&
-      t.tipo === 'Receita' &&
-      t.data_referencia.substring(0, 7) === month
-    )
-
-    if (!rechargeTx) return
-
-    const novoValorStr = window.prompt("Ajustar valor da recarga:", rechargeTx.valor)
-    if (novoValorStr === null) return
-
-    const valorNum = parseFloat(novoValorStr.replace(',', '.'))
-    if (isNaN(valorNum) || valorNum <= 0) {
-      alert("Por favor, digite um valor válido maior que zero.")
-      return
-    }
-
-    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
-    if (isSupabaseConfigured && !isSupabaseActive) {
-      alert("Operação não permitida: O Supabase não está conectado.")
-      return
-    }
-
-    setIsSyncing(true)
-    try {
-      if (isSupabaseActive) {
-        const { data, error } = await supabase
-          .from('transacoes')
-          .update({ valor: valorNum })
-          .eq('id', rechargeTx.id)
-          .select()
-
-        if (error) throw error
-        if (data && data.length > 0) {
-          setTransactions(prev => prev.map(t => t.id === rechargeTx.id ? data[0] : t))
-        }
-      } else {
-        setTransactions(prev => prev.map(t => t.id === rechargeTx.id ? { ...t, valor: valorNum } : t))
-      }
-    } catch (err) {
-      console.error("Erro ao atualizar recarga no Supabase:", err.message)
-      alert("Erro ao atualizar recarga no Supabase: " + err.message)
-    } finally {
-      setIsSyncing(false)
-    }
-  }
-
-  // --- Funções de Ajuda e Lógica para Importação Inteligente de Planilhas ---
-  const guessCategoryAndTipo = (subcatStr, valueNum) => {
-    const lower = subcatStr.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    let category = 'Casa';
-    let tipo = valueNum >= 0 ? 'Receita' : 'Despesa';
-    
-    if (lower.includes('salario') || lower.includes('proventos') || lower.includes('rendimento') || lower.includes('recebimento') || lower.includes('renda extra') || lower.includes('ganho') || lower.includes('ted ') || lower.includes('pix recebido')) {
-      category = 'Salário';
-      tipo = 'Receita';
-    } else if (lower.includes('comida') || lower.includes('mercado') || lower.includes('restaurante') || lower.includes('supermercado') || lower.includes('padaria') || lower.includes('feira') || lower.includes('acougue') || lower.includes('ifood') || lower.includes('hortifruti')) {
-      category = 'Alimentação';
-      tipo = 'Despesa';
-    } else if (lower.includes('aluguel') || lower.includes('condominio') || lower.includes('luz') || lower.includes('agua') || lower.includes('internet') || lower.includes('celular') || lower.includes('apartamento') || lower.includes('energia') || lower.includes('gas') || lower.includes('faxina') || lower.includes('garagem') || lower.includes('casa') || lower.includes('iptu') || lower.includes('moveis')) {
-      category = 'Casa';
-      tipo = 'Despesa';
-    } else if (lower.includes('viagem') || lower.includes('cinema') || lower.includes('show') || lower.includes('festa') || lower.includes('lazer') || lower.includes('streaming') || lower.includes('netflix') || lower.includes('meli') || lower.includes('spotify') || lower.includes('jogos') || lower.includes('hospedagem') || lower.includes('passeio')) {
-      category = 'Lazer';
-      tipo = 'Despesa';
-    } else if (lower.includes('carro') || lower.includes('combustivel') || lower.includes('uber') || lower.includes('onibus') || lower.includes('pedagio') || lower.includes('moto') || lower.includes('seguro') || lower.includes('transporte') || lower.includes('mecanico') || lower.includes('licenciamento') || lower.includes('ipva')) {
-      category = 'Transporte';
-      tipo = 'Despesa';
-    } else if (lower.includes('remedio') || lower.includes('medico') || lower.includes('hospital') || lower.includes('farmacia') || lower.includes('saude') || lower.includes('plano') || lower.includes('dentista') || lower.includes('exame') || lower.includes('consulta')) {
-      category = 'Saúde';
-      tipo = 'Despesa';
-    } else if (lower.includes('escola') || lower.includes('curso') || lower.includes('faculdade') || lower.includes('livro') || lower.includes('mensalidade') || lower.includes('material escolar') || lower.includes('educacao')) {
-      category = 'Educação';
-      tipo = 'Despesa';
-    } else if (lower.includes('cabelo') || lower.includes('sobrancelha') || lower.includes('estetica') || lower.includes('roupa') || lower.includes('pessoal') || lower.includes('perfume') || lower.includes('calcado')) {
-      category = 'Despesas Pessoais';
-      tipo = 'Despesa';
-    } else if (lower.includes('dizimo') || lower.includes('oferta') || lower.includes('igreja') || lower.includes('doacao')) {
-      category = 'Dízimo';
-      tipo = 'Despesa';
-    } else if (lower.includes('investimento') || lower.includes('poupanca') || lower.includes('acao') || lower.includes('tesouro') || lower.includes('aplicacao')) {
-      category = 'Investimentos';
-      tipo = 'Despesa';
-    } else {
-      category = 'Imprevistos';
-      tipo = 'Despesa';
-    }
-    return { category, tipo };
-  }
-
-  const handleCSVUpload = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    setImportFilename(file.name)
-    setImportError('')
-    
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      try {
-        const text = event.target.result
-        const parsed = processCSVData(text)
-        if (parsed.length === 0) {
-          setImportError('Nenhuma linha de transação válida encontrada no arquivo ou delimitador/cabeçalhos incompatíveis.')
-        }
-        setImportRows(parsed)
-      } catch (err) {
-        setImportError('Erro ao ler o arquivo CSV: ' + err.message)
-      }
-    }
-    reader.readAsText(file, 'UTF-8')
-  }
-
-  const processCSVData = (text) => {
-    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0)
-    if (lines.length === 0) return []
-
-    let delimiter = ','
-    let maxDelimCount = -1
-    const possibleDelimiters = [',', ';', '\t']
-    
-    const testLines = lines.slice(0, Math.min(lines.length, 5))
-    possibleDelimiters.forEach(delim => {
-      let count = 0
-      testLines.forEach(line => {
-        count += (line.match(new RegExp(delim === '\t' ? '\\t' : delim, 'g')) || []).length
-      })
-      if (count > maxDelimCount) {
-        maxDelimCount = count
-        delimiter = delim
-      }
-    })
-
-    const splitCSVLine = (lineStr, delim) => {
-      const result = []
-      let current = ''
-      let inQuotes = false
-      for (let i = 0; i < lineStr.length; i++) {
-        const char = lineStr[i]
-        if (char === '"') {
-          inQuotes = !inQuotes
-        } else if (char === delim && !inQuotes) {
-          result.push(current.trim())
-          current = ''
-        } else {
-          current += char
-        }
-      }
-      result.push(current.trim())
-      return result.map(val => val.replace(/^"|"$/g, '').trim())
-    }
-
-    const parseRobustNumber = (valStr) => {
-      if (!valStr) return 0
-      let clean = valStr.replace(/[R$\s]/g, '').trim()
-      if (clean === '' || clean === '-' || clean === '0' || clean === '0,00' || clean === '0.00') return 0
-      
-      let isNegative = clean.startsWith('-') || clean.endsWith('-')
-      clean = clean.replace(/-/g, '')
-      
-      const commaIndex = clean.lastIndexOf(',')
-      const dotIndex = clean.lastIndexOf('.')
-      
-      if (commaIndex > dotIndex) {
-        clean = clean.replace(/\./g, '').replace(',', '.')
-      } else if (dotIndex > commaIndex) {
-        clean = clean.replace(/,/g, '')
-      } else {
-        if (commaIndex !== -1) {
-          clean = clean.replace(',', '.')
-        }
-      }
-      
-      const num = parseFloat(clean)
-      if (isNaN(num)) return 0
-      return isNegative ? -num : num
-    }
-
-    const parsedTransactions = []
-    let isFormatB = false
-    let monthHeadersIndexMap = {}
-    let headerLineIndex = -1
-    const ptMonths = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
-
-    for (let i = 0; i < Math.min(lines.length, 10); i++) {
-      const cols = splitCSVLine(lines[i], delimiter)
-      const cleaned = cols.map(c => c.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim())
-      
-      let matchCount = 0
-      cleaned.forEach(c => {
-        if (ptMonths.includes(c)) matchCount++
-      })
-
-      if (matchCount >= 3) {
-        isFormatB = true
-        headerLineIndex = i
-        cleaned.forEach((c, colIdx) => {
-          const monthNum = ptMonths.indexOf(c) + 1
-          if (monthNum > 0) {
-            monthHeadersIndexMap[colIdx] = monthNum
-          }
-        })
-        break
-      }
-    }
-
-    if (isFormatB) {
-      let activeCategory = 'Casa'
-      let activeTipo = 'Despesa'
-      const activeYear = selectedMonth ? selectedMonth.split('-')[0] : new Date().getFullYear().toString()
-
-      for (let i = headerLineIndex + 1; i < lines.length; i++) {
-        const columns = splitCSVLine(lines[i], delimiter)
-        if (columns.length === 0 || (columns.length === 1 && columns[0] === '')) continue
-
-        const col1Clean = columns[1] ? columns[1].trim() : ''
-        const col2Clean = columns[2] ? columns[2].trim() : ''
-        const col0Clean = columns[0] ? columns[0].trim() : ''
-
-        const isSectionHeader = (col1Clean !== '' && col2Clean === '') || (col0Clean !== '' && col1Clean === '' && col2Clean === '')
-        if (isSectionHeader) {
-          const sectionName = (col1Clean !== '' ? col1Clean : col0Clean).toUpperCase()
-          if (sectionName.includes('RENDA') || sectionName.includes('RECEITA') || sectionName.includes('ENTRADA') || sectionName.includes('GANHO') || sectionName.includes('SALARIO')) {
-            activeCategory = 'Salário'
-            activeTipo = 'Receita'
-          } else if (sectionName.includes('CASA') || sectionName.includes('MORADIA') || sectionName.includes('RESIDENC')) {
-            activeCategory = 'Casa'
-            activeTipo = 'Despesa'
-          } else if (sectionName.includes('SAUDE') || sectionName.includes('MEDIC') || sectionName.includes('FARMAC') || sectionName.includes('CLINIC')) {
-            activeCategory = 'Saúde'
-            activeTipo = 'Despesa'
-          } else if (sectionName.includes('DIZIMO') || sectionName.includes('IGREJA') || sectionName.includes('OFERTA') || sectionName.includes('CONTRIB')) {
-            activeCategory = 'Dízimo'
-            activeTipo = 'Despesa'
-          } else if (sectionName.includes('TRANSPORTE') || sectionName.includes('CARRO') || sectionName.includes('MOTO') || sectionName.includes('VEICULO') || sectionName.includes('AUTO') || sectionName.includes('COMBUST')) {
-            activeCategory = 'Transporte'
-            activeTipo = 'Despesa'
-          } else if (sectionName.includes('LAZER') || sectionName.includes('ENTRETEN') || sectionName.includes('VIAG') || sectionName.includes('PASS')) {
-            activeCategory = 'Lazer'
-            activeTipo = 'Despesa'
-          } else if (sectionName.includes('POUPANCA') || sectionName.includes('INVESTIM') || sectionName.includes('RESERVA') || sectionName.includes('GUARDAD')) {
-            activeCategory = 'Investimentos'
-            activeTipo = 'Despesa'
-          } else if (sectionName.includes('EDUCAC') || sectionName.includes('CURSO') || sectionName.includes('ESCOLA') || sectionName.includes('FACULD')) {
-            activeCategory = 'Educação'
-            activeTipo = 'Despesa'
-          } else if (sectionName.includes('PESSOAL') || sectionName.includes('INDIVIDUAL') || sectionName.includes('CABELO') || sectionName.includes('ESTETIC') || sectionName.includes('ROUPA')) {
-            activeCategory = 'Despesas Pessoais'
-            activeTipo = 'Despesa'
-          } else {
-            const guessed = guessCategoryAndTipo(sectionName, 0)
-            activeCategory = guessed.category
-            activeTipo = guessed.tipo
-          }
-          continue
-        }
-
-        let initials = ''
-        let subcat = ''
-        const col3Clean = columns[3] ? columns[3].trim() : ''
-
-        const val2 = col2Clean.toUpperCase()
-        if (val2 === 'F' || val2 === 'L' || val2 === 'T' || val2 === 'C') {
-          initials = val2
-          subcat = col3Clean || col1Clean || col0Clean
-        } else {
-          subcat = col2Clean || col1Clean || col0Clean
-          if (columns[4] && (columns[4].toUpperCase() === 'F' || columns[4].toUpperCase() === 'L' || columns[4].toUpperCase() === 'T' || columns[4].toUpperCase() === 'C')) {
-            initials = columns[4]
-          }
-        }
-
-        if (!subcat) continue
-
-        let quem_pagou = 'Lucas'
-        const initialsUpper = initials.toUpperCase()
-        if ((initialsUpper.includes('F') || initialsUpper.includes('L')) && (initialsUpper.includes('T') || initialsUpper.includes('C'))) {
-          quem_pagou = 'Lucas / Carol'
-        } else if (initialsUpper.includes('T') || initialsUpper.includes('C')) {
-          quem_pagou = 'Carol'
-        } else {
-          quem_pagou = 'Lucas'
-        }
-
-        Object.keys(monthHeadersIndexMap).forEach(colIdxStr => {
-          const colIdx = parseInt(colIdxStr, 10)
-          const monthNum = monthHeadersIndexMap[colIdx]
-          const cellValue = columns[colIdx] ? columns[colIdx].trim() : ''
-
-          const valorNum = parseRobustNumber(cellValue)
-          if (valorNum === 0) return
-
-          const dateRef = `${activeYear}-${String(monthNum).padStart(2, '0')}-01`
-
-          parsedTransactions.push({
-            data_referencia: dateRef,
-            tipo: activeTipo,
-            categoria: activeCategory,
-            subcategoria: subcat,
-            valor: Math.abs(valorNum),
-            quem_pagou: quem_pagou,
-            status: 'Pago',
-            criado_em: new Date().toISOString()
-          })
-        })
-      }
-    } else {
-      let activeContexts = []
-
-      for (let i = 0; i < lines.length; i++) {
-        const columns = splitCSVLine(lines[i], delimiter)
-        if (columns.length === 0 || (columns.length === 1 && columns[0] === '')) continue
-
-        const cleanedCols = columns.map(c => 
-          c.toLowerCase()
-           .normalize("NFD")
-           .replace(/[\u0300-\u036f]/g, "")
-           .replace(/[^a-z0-9_]/g, "")
-        )
-
-        const valorIndexes = []
-        cleanedCols.forEach((c, idx) => {
-          if (c === 'valor' || c === 'value' || c === 'quantia' || c === 'monto' || c === 'valortotal') {
-            valorIndexes.push(idx)
-          }
-        })
-
-        const isHeaderRow = valorIndexes.length > 0 && (
-          cleanedCols.includes('vencimento') || 
-          cleanedCols.includes('data') || 
-          cleanedCols.includes('date') || 
-          cleanedCols.includes('dia') || 
-          cleanedCols.includes('situacao') || 
-          cleanedCols.includes('status') || 
-          cleanedCols.includes('pago') || 
-          cleanedCols.includes('categoria') || 
-          cleanedCols.includes('subcategoria') ||
-          cleanedCols.includes('descricao')
-        )
-
-        if (isHeaderRow) {
-          activeContexts = []
-          for (let k = 0; k < valorIndexes.length; k++) {
-            const vCol = valorIndexes[k]
-            const start = k === 0 ? 0 : Math.floor((valorIndexes[k-1] + vCol) / 2) + 1
-            const end = k === valorIndexes.length - 1 ? columns.length - 1 : Math.floor((vCol + valorIndexes[k+1]) / 2)
-
-            let dateIdx = -1
-            let statusIdx = -1
-            let categoryIdx = -1
-            let tipoIdx = -1
-            let quemIdx = -1
-            let subcatIdx = -1
-
-            for (let cIdx = start; cIdx <= end; cIdx++) {
-              const cleaned = cleanedCols[cIdx]
-              if (cleaned === 'vencimento' || cleaned === 'data' || cleaned === 'date' || cleaned === 'dia' || cleaned === 'datareferencia' || cleaned === 'referencia') {
-                dateIdx = cIdx
-              } else if (cleaned === 'situacao' || cleaned === 'status' || cleaned === 'pago' || cleaned === 'situac') {
-                statusIdx = cIdx
-              } else if (cleaned === 'categoria' || cleaned === 'category' || cleaned === 'grupo' || cleaned === 'classificacao') {
-                categoryIdx = cIdx
-              } else if (cleaned === 'tipo' || cleaned === 'type') {
-                tipoIdx = cIdx
-              } else if (cleaned === 'quem' || cleaned === 'pagou' || cleaned === 'quempagou' || cleaned === 'responsavel' || cleaned === 'pagador') {
-                quemIdx = cIdx
-              } else if (cleaned === 'subcategoria' || cleaned === 'descricao' || cleaned === 'description' || cleaned === 'subcategory' || cleaned === 'item' || cleaned === 'detalhe' || cleaned === 'historico') {
-                subcatIdx = cIdx
-              }
-            }
-
-            if (subcatIdx === -1) {
-              for (let cIdx = start; cIdx <= end; cIdx++) {
-                if (cIdx !== vCol && cIdx !== dateIdx && cIdx !== statusIdx && cIdx !== categoryIdx && cIdx !== tipoIdx && cIdx !== quemIdx) {
-                  if (columns[cIdx] !== '') {
-                    subcatIdx = cIdx
-                    break
-                  }
-                }
-              }
-            }
-
-            activeContexts.push({
-              valueIdx: vCol,
-              dateIdx,
-              statusIdx,
-              categoryIdx,
-              tipoIdx,
-              quemIdx,
-              subcatIdx,
-              start,
-              end
-            })
-          }
-          continue
-        }
-
-        if (activeContexts.length > 0) {
-          activeContexts.forEach(ctx => {
-            if (ctx.valueIdx === -1 || !columns[ctx.valueIdx]) return
-
-            const rawValor = columns[ctx.valueIdx]
-            const valorNum = parseRobustNumber(rawValor)
-            if (valorNum === 0) return
-
-            const subcat = ctx.subcatIdx !== -1 && columns[ctx.subcatIdx] ? columns[ctx.subcatIdx].trim() : ''
-            if (!subcat) return
-
-            let dataRef = ''
-            if (ctx.dateIdx !== -1 && columns[ctx.dateIdx]) {
-              const rawDateStr = columns[ctx.dateIdx].trim()
-              const diaNum = parseInt(rawDateStr, 10)
-              
-              if (!isNaN(diaNum) && diaNum >= 1 && diaNum <= 31) {
-                const [y, m] = selectedMonth.split('-')
-                dataRef = `${y}-${m}-${String(diaNum).padStart(2, '0')}`
-              } else {
-                let rawDate = rawDateStr.replace(/\//g, '-')
-                const dParts = rawDate.split('-')
-                if (dParts.length === 3) {
-                  if (dParts[0].length === 2 && dParts[2].length === 4) {
-                    dataRef = `${dParts[2]}-${dParts[1]}-${dParts[0]}`
-                  } else if (dParts[0].length === 4) {
-                    dataRef = rawDate
-                  }
-                }
-              }
-            }
-
-            if (!dataRef) {
-              dataRef = `${selectedMonth}-01`
-            }
-
-            let tipo = 'Despesa'
-            if (ctx.tipoIdx !== -1 && columns[ctx.tipoIdx]) {
-              const rawTipo = columns[ctx.tipoIdx].toLowerCase()
-              if (rawTipo.includes('receita') || rawTipo.includes('entrada') || rawTipo.includes('ganho') || rawTipo.includes('salario')) {
-                tipo = 'Receita'
-              }
-            } else if (rawValor.includes('+') || valorNum > 0) {
-              const guessed = guessCategoryAndTipo(subcat, valorNum)
-              tipo = guessed.tipo
-            }
-
-            let categoria = 'Casa'
-            if (ctx.categoryIdx !== -1 && columns[ctx.categoryIdx]) {
-              const rawCat = columns[ctx.categoryIdx].trim()
-              const match = categoriasValidas.find(cv => cv.toLowerCase() === rawCat.toLowerCase())
-              if (match) {
-                categoria = match
-              } else {
-                const guessed = guessCategoryAndTipo(subcat, valorNum)
-                categoria = guessed.category
-              }
-            } else {
-              const guessed = guessCategoryAndTipo(subcat, valorNum)
-              categoria = guessed.category
-              tipo = guessed.tipo
-            }
-
-            let quem_pagou = 'Lucas'
-            if (ctx.quemIdx !== -1 && columns[ctx.quemIdx]) {
-              const rawQuem = columns[ctx.quemIdx].toLowerCase()
-              if (rawQuem.includes('carol') || rawQuem === 'c' || rawQuem === 't' || rawQuem === 'thais') {
-                quem_pagou = 'Carol'
-              } else if (rawQuem.includes('lucas') || rawQuem === 'l' || rawQuem === 'f' || rawQuem === 'felipe') {
-                quem_pagou = 'Lucas'
-              } else if (rawQuem.includes('/') || rawQuem.includes('&') || rawQuem.includes('ambos')) {
-                quem_pagou = 'Lucas / Carol'
-              }
-            }
-
-            let status = 'Pago'
-            if (ctx.statusIdx !== -1 && columns[ctx.statusIdx]) {
-              const rawStatus = columns[ctx.statusIdx].toLowerCase()
-              if (rawStatus.includes('pendente') || rawStatus === 'n' || rawStatus === 'nao' || rawStatus === 'false' || rawStatus === '0') {
-                status = 'Pendente'
-              }
-            } else {
-              status = 'Pago'
-            }
-
-            parsedTransactions.push({
-              data_referencia: dataRef,
-              tipo,
-              categoria,
-              subcategoria: subcat,
-              valor: Math.abs(valorNum),
-              quem_pagou,
-              status,
-              criado_em: new Date().toISOString()
-            })
-          })
-        }
-      }
-    }
-    return parsedTransactions
-  }
-
-  const handleConfirmImport = async () => {
-    if (importRows.length === 0) return
-
-    setIsSyncing(true)
-    try {
-      if (isSupabaseConfigured && dbStatus === 'supabase_connected') {
-        const { data, error } = await supabase
-          .from('transacoes')
-          .insert(importRows)
-          .select()
-
-        if (error) throw error
-
-        if (data && data.length > 0) {
-          setTransactions(prev => [...data, ...prev])
-        } else {
-          loadData()
-        }
-      } else {
-        const localTxs = importRows.map((row, idx) => ({
-          ...row,
-          id: 'tx-imported-' + Date.now() + '-' + idx
-        }))
-        setTransactions(prev => [...localTxs, ...prev])
-      }
-
-      alert(`Sucesso! ${importRows.length} lançamentos foram importados com sucesso.`)
-      setImportRows([])
-      setImportFilename('')
-      setIsImportModalOpen(false)
-    } catch (err) {
-      console.error("Erro ao importar planilhas:", err.message)
-      alert("Erro ao importar no Supabase: " + err.message)
-    } finally {
-      setIsSyncing(false)
-    }
-  }
-
 
   // Sincronizar dados locais se o Supabase não estiver ativo
   const loadLocalData = async () => {
@@ -2090,37 +1537,24 @@ export default function App() {
   const dinheiroLivre = Math.max(0, dinheiroEmConta - totalDespesasPendentes)
 
   // --- Cálculos do Vale Alimentação/Refeição Flexível (VA/VR) ---
-  // Transações do mês ativo
   const activeMonthVRVATxs = activeMonthTransactions.filter(t => t.categoria === 'Vale Alimentação/Refeição')
-  const activeMonthCargaVRVA = activeMonthVRVATxs
+  const cargaVRVA = activeMonthVRVATxs
     .filter(t => t.tipo === 'Receita')
     .reduce((sum, t) => sum + t.valor, 0)
-  const activeMonthGastoVRVA = activeMonthVRVATxs
+  const gastoVRVA = activeMonthVRVATxs
     .filter(t => t.tipo === 'Despesa')
     .reduce((sum, t) => sum + t.valor, 0)
 
-  // Transações históricas até o mês ativo (inclusive)
-  const allVRVATxsUpToSelectedMonth = transactions.filter(t => 
-    t.categoria === 'Vale Alimentação/Refeição' &&
-    t.data_referencia.substring(0, 7) <= selectedMonth
-  )
-  const cumulativeCargaVRVA = allVRVATxsUpToSelectedMonth
-    .filter(t => t.tipo === 'Receita')
+  // Saldo Restante Flexível cumulativo de todo o histórico até o mês selecionado
+  const cumulativeCargaVRVA = transactions
+    .filter(t => t.categoria === 'Vale Alimentação/Refeição' && t.tipo === 'Receita' && t.data_referencia.substring(0, 7) <= selectedMonth)
     .reduce((sum, t) => sum + t.valor, 0)
-  const cumulativeGastoVRVA = allVRVATxsUpToSelectedMonth
-    .filter(t => t.tipo === 'Despesa')
+  const cumulativeGastoVRVA = transactions
+    .filter(t => t.categoria === 'Vale Alimentação/Refeição' && t.tipo === 'Despesa' && t.data_referencia.substring(0, 7) <= selectedMonth)
     .reduce((sum, t) => sum + t.valor, 0)
-
-  // Saldo Restante Flexível é acumulativo de todo o histórico
   const saldoRestanteVRVA = cumulativeCargaVRVA - cumulativeGastoVRVA
 
-  // Carga e gastos exibidos nos cards são os mensais
-  const cargaVRVA = activeMonthCargaVRVA
-  const gastoVRVA = activeMonthGastoVRVA
-
-  // O percentual de uso representa quanto do saldo recarregado foi gasto, com fallback de 1004.00 caso não haja recarga no mês
-  const limitForPct = activeMonthCargaVRVA > 0 ? activeMonthCargaVRVA : 1004.00
-  const pctVRVA = (activeMonthGastoVRVA / limitForPct) * 100
+  const pctVRVA = cargaVRVA > 0 ? (gastoVRVA / cargaVRVA) * 100 : 0
 
   const getFreeMoneyData = () => {
     if (dinheiroEmConta >= totalDespesasPendentes) {
@@ -2533,13 +1967,6 @@ export default function App() {
               </div>
 
               <div className="flex gap-2 w-full sm:w-auto">
-                <button
-                  onClick={() => setIsImportModalOpen(true)}
-                  className="btn-secondary flex items-center justify-center gap-1.5"
-                >
-                  <Upload className="h-4.5 w-4.5" />
-                  <span className="hidden sm:inline">Importar</span>
-                </button>
                 <button
                   onClick={() => {
                     setEditingTransactionId(null)
@@ -3148,22 +2575,22 @@ export default function App() {
                           {formatCurrency(dinheiroLivre).split(',')[0]}
                         </span>
                       </div>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={freeMoneyData.length > 0 ? freeMoneyData : [{ name: 'Sem dados', value: 1, color: theme === 'dark' ? '#334155' : '#e2e8f0' }]}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={55}
-                            outerRadius={75}
-                            paddingAngle={freeMoneyData.length > 0 ? 3 : 0}
-                            dataKey="value"
-                          >
-                            {(freeMoneyData.length > 0 ? freeMoneyData : [{ name: 'Sem dados', value: 1, color: theme === 'dark' ? '#334155' : '#e2e8f0' }]).map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          {freeMoneyData.length > 0 && (
+                      {freeMoneyData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={freeMoneyData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={55}
+                              outerRadius={75}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {freeMoneyData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
                             <Tooltip
                               contentStyle={{
                                 backgroundColor: theme === 'dark' ? '#1e293b' : '#fdf2f8',
@@ -3175,9 +2602,13 @@ export default function App() {
                               }}
                               formatter={(val) => [formatCurrency(val)]}
                             />
-                          )}
-                        </PieChart>
-                      </ResponsiveContainer>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-xs text-slate-500 italic">
+                          Sem dados
+                        </div>
+                      )}
                     </div>
 
                     {/* Legenda detalhada */}
@@ -3258,18 +2689,7 @@ export default function App() {
                     <div className="grid grid-cols-2 gap-2 pt-2">
                       <div className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/20 dark:border-slate-800/20">
                         <span className="text-[10px] text-slate-500 block">Recarregado</span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatCurrency(cargaVRVA)}</span>
-                          {cargaVRVA > 0 && (
-                            <button
-                              onClick={() => handleEditVRVARecharge(selectedMonth)}
-                              className="p-0.5 rounded hover:bg-pink-200/50 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                              title="Editar valor da recarga"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatCurrency(cargaVRVA)}</span>
                       </div>
                       <div className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/20 dark:border-slate-800/20">
                         <span className="text-[10px] text-slate-500 block">Gasto Realizado</span>
@@ -3590,13 +3010,6 @@ export default function App() {
                 <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Controle Detalhado de Lançamentos</h2>
                 <p className="text-sm text-slate-500">Adicione novos registros ou audite a lista completa de despesas e receitas</p>
               </div>
-              <button
-                onClick={() => setIsImportModalOpen(true)}
-                className="btn-secondary w-full sm:w-auto flex items-center justify-center gap-1.5"
-              >
-                <Upload className="h-4.5 w-4.5" />
-                Importar Planilha
-              </button>
               <button
                 onClick={() => {
                   setEditingTransactionId(null)
@@ -4548,167 +3961,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* --- MODAL DE IMPORTAÇÃO DE PLANILHA CSV --- */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div
-            className="w-full max-w-2xl bg-pink-50 dark:bg-slate-900 rounded-3xl shadow-2xl border border-pink-200/60 dark:border-slate-800/50 overflow-hidden animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Cabeçalho */}
-            <div className="p-6 bg-gradient-to-r from-pink-600 to-rose-600 dark:from-slate-900 dark:to-slate-950 text-white flex justify-between items-center">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-white/10 rounded-lg">
-                  <Upload className="h-5 w-5 text-pink-100 dark:text-amber-400" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base">Importar Lançamentos</h3>
-                  <p className="text-[10px] text-pink-200/90 dark:text-slate-400">Importe uma planilha CSV em lote</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setImportRows([])
-                  setImportFilename('')
-                  setImportError('')
-                  setIsImportModalOpen(false)
-                }}
-                className="text-white/85 hover:text-white text-sm font-bold bg-white/15 hover:bg-white/20 px-2.5 py-1 rounded-lg transition-all"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Conteúdo */}
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div className="p-4 bg-pink-100/20 dark:bg-slate-950/30 border border-pink-200/40 dark:border-slate-800/40 rounded-2xl text-xs space-y-2">
-                <p className="font-bold text-pink-900 dark:text-amber-400">💡 Como deve ser o arquivo CSV:</p>
-                <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
-                  <li>Exportar a planilha como <strong>CSV separado por vírgulas, ponto e vírgula ou tabulações</strong>.</li>
-                  <li>Funciona com tabelas verticais simples, tabelas múltiplas paralelas ou o formato de planejamento mensal horizontal (meses como colunas).</li>
-                  <li>Formatos de valor suportados: R$ 1.500,00 ou 1500.00.</li>
-                </ul>
-              </div>
-
-              {/* Input do Arquivo */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 block">Selecionar arquivo CSV</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleCSVUpload}
-                    className="hidden"
-                    id="csv-file-input"
-                  />
-                  <label
-                    htmlFor="csv-file-input"
-                    className="btn-secondary text-xs py-2 px-4 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Escolher Arquivo
-                  </label>
-                  <span className="text-xs text-slate-600 dark:text-slate-300 italic truncate max-w-[250px]">
-                    {importFilename || 'Nenhum arquivo selecionado'}
-                  </span>
-                </div>
-              </div>
-
-              {importError && (
-                <div className="p-3 bg-red-100/30 border border-red-200/50 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold">
-                  ⚠️ {importError}
-                </div>
-              )}
-
-              {/* Tabela de Preview */}
-              {importRows.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-500">
-                    Pré-visualização dos Lançamentos ({importRows.length} linhas detectadas)
-                  </h4>
-                  <div className="overflow-x-auto border border-pink-200/40 dark:border-slate-800/40 rounded-xl max-h-[220px] overflow-y-auto">
-                    <table className="w-full text-[11px] text-left border-collapse">
-                      <thead>
-                        <tr className="bg-pink-100/30 dark:bg-slate-950/40 border-b border-pink-200/40 dark:border-slate-800/40 font-bold text-slate-700 dark:text-slate-300">
-                          <th className="p-2">Data</th>
-                          <th className="p-2">Tipo</th>
-                          <th className="p-2">Categoria</th>
-                          <th className="p-2">Subcategoria</th>
-                          <th className="p-2">Valor</th>
-                          <th className="p-2">Quem</th>
-                          <th className="p-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-pink-100/20 dark:divide-slate-800/20 text-slate-600 dark:text-slate-300">
-                        {importRows.slice(0, 15).map((row, idx) => (
-                          <tr key={idx} className="hover:bg-pink-100/5 dark:hover:bg-slate-800/30">
-                            <td className="p-2 whitespace-nowrap">{formatDate(row.data_referencia)}</td>
-                            <td className="p-2">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${row.tipo === 'Receita' ? 'bg-green-100 text-green-800 dark:bg-green-950/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-950/30 dark:text-red-400'}`}>
-                                {row.tipo}
-                              </span>
-                            </td>
-                            <td className="p-2 whitespace-nowrap">{row.categoria}</td>
-                            <td className="p-2 max-w-[120px] truncate" title={row.subcategoria}>{row.subcategoria}</td>
-                            <td className="p-2 font-bold">{formatCurrency(row.valor)}</td>
-                            <td className="p-2">{row.quem_pagou}</td>
-                            <td className="p-2">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${row.status === 'Pago' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400'}`}>
-                                {row.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {importRows.length > 15 && (
-                    <p className="text-[10px] text-slate-400 italic">
-                      * Exibindo apenas os primeiros 15 lançamentos para pré-visualização.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Ações */}
-            <div className="p-6 bg-pink-100/10 dark:bg-slate-950/20 border-t border-pink-200/50 dark:border-slate-800/50 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setImportRows([])
-                  setImportFilename('')
-                  setImportError('')
-                  setIsImportModalOpen(false)
-                }}
-                className="btn-secondary text-xs"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmImport}
-                disabled={importRows.length === 0 || isSyncing}
-                className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isSyncing ? (
-                  <>
-                    <RefreshCw className="h-4.5 w-4.5 animate-spin" />
-                    Sincronizando...
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4.5 w-4.5" />
-                    Confirmar Importação
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
 
       {/* --- MODAL DE TRANSFERÊNCIA DE SALDO ENTRE CONTAS --- */}
       {isTransferModalOpen && (
