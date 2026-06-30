@@ -134,9 +134,9 @@ export default function App() {
     'Cartão de Crédito',
     'Casa',
     'Despesas Pessoais',
-    'Dinheiro Guardado',
     'Dízimo',
     'Educação',
+    'Guardar Dinheiro',
     'Imprevistos',
     'Investimentos',
     'Lazer',
@@ -565,7 +565,11 @@ export default function App() {
           }
 
           const oldTx = transactions.find(t => t.id === editingTransactionId)
-          if (updatedTx.categoria === 'Dinheiro Guardado' || (oldTx && oldTx.categoria === 'Dinheiro Guardado')) {
+          if (
+            updatedTx.categoria === 'Guardar Dinheiro' ||
+            updatedTx.categoria === 'Dinheiro Guardado' ||
+            (oldTx && (oldTx.categoria === 'Guardar Dinheiro' || oldTx.categoria === 'Dinheiro Guardado'))
+          ) {
             await handleSyncPoupancaFromTxs([updatedTx], 'update', [oldTx])
           }
 
@@ -624,7 +628,7 @@ export default function App() {
         if (error) throw error
 
         if (data && data.length > 0) {
-          const savedMoneyTxs = data.filter(t => t.categoria === 'Dinheiro Guardado')
+          const savedMoneyTxs = data.filter(t => t.categoria === 'Guardar Dinheiro' || t.categoria === 'Dinheiro Guardado')
           if (savedMoneyTxs.length > 0) {
             await handleSyncPoupancaFromTxs(savedMoneyTxs, 'insert')
           }
@@ -699,7 +703,7 @@ export default function App() {
       if (error) throw error
 
       const tx = transactions.find(t => t.id === id)
-      if (tx && tx.categoria === 'Dinheiro Guardado') {
+      if (tx && (tx.categoria === 'Guardar Dinheiro' || tx.categoria === 'Dinheiro Guardado')) {
         await handleSyncPoupancaFromTxs([tx], 'delete')
       }
 
@@ -1081,7 +1085,7 @@ export default function App() {
 
       if (error) throw error
 
-      if (tx.categoria === 'Dinheiro Guardado') {
+      if (tx.categoria === 'Guardar Dinheiro' || tx.categoria === 'Dinheiro Guardado') {
         await handleSyncPoupancaFromTxs([{ ...tx, status: newStatus }], 'update', [tx])
       }
 
@@ -1108,7 +1112,7 @@ export default function App() {
     }
   }
 
-  // --- Sincronização automática do saldo de poupança (Dinheiro Guardado) ---
+  // --- Sincronização automática do saldo de poupança (Guardar Dinheiro) ---
   const handleSyncPoupancaFromTxs = async (txs, actionType, oldTxs = []) => {
     try {
       const { data: latestPoupancas, error: fetchError } = await supabase
@@ -1172,7 +1176,7 @@ export default function App() {
           const oldTx = oldTxs[i]
 
           // Reverter antigo
-          if (oldTx && oldTx.categoria === 'Dinheiro Guardado' && oldTx.status === 'Pago') {
+          if (oldTx && (oldTx.categoria === 'Guardar Dinheiro' || oldTx.categoria === 'Dinheiro Guardado') && oldTx.status === 'Pago') {
             const oldMotivo = oldTx.subcategoria.trim() || 'Livre'
             const oldIsDespesa = oldTx.tipo === 'Despesa'
             const oldDelta = oldIsDespesa ? -oldTx.valor : oldTx.valor
@@ -1188,7 +1192,7 @@ export default function App() {
           }
 
           // Aplicar novo
-          if (newTx && newTx.categoria === 'Dinheiro Guardado' && newTx.status === 'Pago') {
+          if (newTx && (newTx.categoria === 'Guardar Dinheiro' || newTx.categoria === 'Dinheiro Guardado') && newTx.status === 'Pago') {
             const newMotivo = newTx.subcategoria.trim() || 'Livre'
             const newIsDespesa = newTx.tipo === 'Despesa'
             const newDelta = newIsDespesa ? newTx.valor : -newTx.valor
@@ -1248,7 +1252,7 @@ export default function App() {
     }
   }
 
-  // --- Funções do Sistema de Poupança (Dinheiro Guardado) ---
+  // --- Funções do Sistema de Poupança (Guardar Dinheiro) ---
   const handleSavePoupancaTotal = async (e) => {
     e.preventDefault()
     const valorNum = parseBRL(formPoupancaTotal)
@@ -1298,7 +1302,7 @@ export default function App() {
     const motivoNome = formPoupancaMotivoNome.trim()
     const valorNum = parseBRL(formPoupancaMotivoValor)
     if (!motivoNome) {
-      alert("Por favor, digite um motivo para o dinheiro guardado.")
+      alert("Por favor, digite um motivo para guardar dinheiro.")
       return
     }
     if (motivoNome.toLowerCase() === 'total') {
@@ -1451,7 +1455,7 @@ export default function App() {
   }
 
 
-  // --- Cálculos de Poupança (Dinheiro Guardado) ---
+  // --- Cálculos de Poupança (Guardar Dinheiro) ---
   const totalGuardadoItem = poupancas.find(p => p.motivo === 'Total')
   const totalGuardado = totalGuardadoItem ? totalGuardadoItem.valor : 0
   const motivosPoupanca = poupancas.filter(p => p.motivo !== 'Total')
@@ -1923,7 +1927,8 @@ export default function App() {
       case 'Dízimo': return '🙏';
       case 'Transporte': return '🚗';
       case 'Despesas Pessoais': return '👤';
-      case 'Dinheiro Guardado': return '💰';
+      case 'Dinheiro Guardado':
+      case 'Guardar Dinheiro': return '🏦';
       case 'Lazer': return '🍿';
       case 'Investimentos': return '📈';
       case 'Alimentação': return '🍲';
@@ -2461,18 +2466,18 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Painel de Dinheiro Guardado em Evidência */}
+              {/* Painel de Guardar Dinheiro em Evidência */}
               <div className="glass-panel p-6 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Dinheiro Guardado</h3>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Guardar Dinheiro</h3>
                     <button
                       onClick={() => {
                         setFormPoupancaTotal(totalGuardado > 0 ? Number(totalGuardado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '')
                         setIsPoupancaModalOpen(true)
                       }}
                       className="p-2.5 bg-pink-100 hover:bg-pink-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl text-pink-600 dark:text-amber-400 shadow-inner transition-colors"
-                      title="Gerenciar Dinheiro Guardado"
+                      title="Gerenciar Guardar Dinheiro"
                     >
                       <SlidersHorizontal className="h-4.5 w-4.5" />
                     </button>
@@ -3862,7 +3867,7 @@ export default function App() {
         </div>
       )}
 
-      {/* --- MODAL DE GERENCIAMENTO DE POUPANÇA (DINHEIRO GUARDADO) --- */}
+      {/* --- MODAL DE GERENCIAMENTO DE POUPANÇA (GUARDAR DINHEIRO) --- */}
       {isPoupancaModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
           <div
@@ -3876,7 +3881,7 @@ export default function App() {
                   <Wallet className="h-5 w-5 text-pink-100 dark:text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base">Gerenciar Dinheiro Guardado</h3>
+                  <h3 className="font-bold text-base">Gerenciar Guardar Dinheiro</h3>
                   <p className="text-[10px] text-pink-200/90 dark:text-slate-400">Edite seu saldo guardado e distribua por motivos</p>
                 </div>
               </div>
