@@ -134,6 +134,7 @@ export default function App() {
     'Cartão de Crédito',
     'Casa',
     'Despesas Pessoais',
+    'Dinheiro Guardado',
     'Dízimo',
     'Educação',
     'Imprevistos',
@@ -563,6 +564,11 @@ export default function App() {
             }
           }
 
+          const oldTx = transactions.find(t => t.id === editingTransactionId)
+          if (updatedTx.categoria === 'Dinheiro Guardado' || (oldTx && oldTx.categoria === 'Dinheiro Guardado')) {
+            await handleSyncPoupancaFromTxs([updatedTx], 'update', [oldTx])
+          }
+
           setTransactions(prev => {
             let updatedList = prev.map(t => t.id === editingTransactionId ? updatedTx : t);
             if (existingDizimo) {
@@ -618,6 +624,11 @@ export default function App() {
         if (error) throw error
 
         if (data && data.length > 0) {
+          const savedMoneyTxs = data.filter(t => t.categoria === 'Dinheiro Guardado')
+          if (savedMoneyTxs.length > 0) {
+            await handleSyncPoupancaFromTxs(savedMoneyTxs, 'insert')
+          }
+
           // Generate dizimo for Supabase
           const dizimoTxs = data
             .filter(t => t.categoria === 'Renda Extra' && t.tipo === 'Receita')
@@ -686,6 +697,11 @@ export default function App() {
         .eq('id', id)
 
       if (error) throw error
+
+      const tx = transactions.find(t => t.id === id)
+      if (tx && tx.categoria === 'Dinheiro Guardado') {
+        await handleSyncPoupancaFromTxs([tx], 'delete')
+      }
 
       // Delete linked dízimo in Supabase
       const refString = `[Ref: ${id}]`
@@ -1065,6 +1081,10 @@ export default function App() {
 
       if (error) throw error
 
+      if (tx.categoria === 'Dinheiro Guardado') {
+        await handleSyncPoupancaFromTxs([{ ...tx, status: newStatus }], 'update', [tx])
+      }
+
       // Toggle linked dízimo status in Supabase
       const refString = `[Ref: ${tx.id}]`
       const linkedDizimo = transactions.find(t => t.categoria === 'Dízimo' && t.tipo === 'Despesa' && t.subcategoria.includes(refString))
@@ -1085,6 +1105,146 @@ export default function App() {
       alert("Erro ao alternar status no Supabase: " + err.message)
     } finally {
       setIsSyncing(false)
+    }
+  }
+
+  // --- Sincronização automática do saldo de poupança (Dinheiro Guardado) ---
+  const handleSyncPoupancaFromTxs = async (txs, actionType, oldTxs = []) => {
+    try {
+      const { data: latestPoupancas, error: fetchError } = await supabase
+        .from('poupancas')
+        .select('*')
+      if (fetchError) throw fetchError
+
+      let currentPoupancas = [...(latestPoupancas || [])]
+
+      const getOrCreateMotivo = (motivoName) => {
+        let item = currentPoupancas.find(p => p.motivo.toLowerCase() === motivoName.toLowerCase())
+        if (!item) {
+          item = { motivo: motivoName, valor: 0 }
+          currentPoupancas.push(item)
+        }
+        return item
+      }
+
+      const getOrCreateTotal = () => {
+        let item = currentPoupancas.find(p => p.motivo === 'Total')
+        if (!item) {
+          item = { motivo: 'Total', valor: 0 }
+          currentPoupancas.push(item)
+        }
+        return item
+      }
+
+      // Processar cada transação
+      if (actionType === 'insert') {
+        for (const tx of txs) {
+          if (tx.status !== 'Pago') continue
+          const motivoNome = tx.subcategoria.trim() || 'Livre'
+          const isDespesa = tx.tipo === 'Despesa'
+          const delta = isDespesa ? tx.valor : -tx.valor
+
+          const item = getOrCreateMotivo(motivoNome)
+          item.valor += delta
+
+          const totalItem = getOrCreateTotal()
+          totalItem.valor += delta
+        }
+      } else if (actionType === 'delete') {
+        for (const tx of txs) {
+          if (tx.status !== 'Pago') continue
+          const motivoNome = tx.subcategoria.trim() || 'Livre'
+          const isDespesa = tx.tipo === 'Despesa'
+          const delta = isDespesa ? -tx.valor : tx.valor
+
+          const exists = latestPoupancas.some(p => p.motivo.toLowerCase() === motivoNome.toLowerCase())
+          if (exists) {
+            const item = getOrCreateMotivo(motivoNome)
+            item.valor += delta
+
+            const totalItem = getOrCreateTotal()
+            totalItem.valor += delta
+          }
+        }
+      } else if (actionType === 'update') {
+        for (let i = 0; i < txs.length; i++) {
+          const newTx = txs[i]
+          const oldTx = oldTxs[i]
+
+          // Reverter antigo
+          if (oldTx && oldTx.categoria === 'Dinheiro Guardado' && oldTx.status === 'Pago') {
+            const oldMotivo = oldTx.subcategoria.trim() || 'Livre'
+            const oldIsDespesa = oldTx.tipo === 'Despesa'
+            const oldDelta = oldIsDespesa ? -oldTx.valor : oldTx.valor
+
+            const exists = latestPoupancas.some(p => p.motivo.toLowerCase() === oldMotivo.toLowerCase())
+            if (exists) {
+              const item = getOrCreateMotivo(oldMotivo)
+              item.valor += oldDelta
+
+              const totalItem = getOrCreateTotal()
+              totalItem.valor += oldDelta
+            }
+          }
+
+          // Aplicar novo
+          if (newTx && newTx.categoria === 'Dinheiro Guardado' && newTx.status === 'Pago') {
+            const newMotivo = newTx.subcategoria.trim() || 'Livre'
+            const newIsDespesa = newTx.tipo === 'Despesa'
+            const newDelta = newIsDespesa ? newTx.valor : -newTx.valor
+
+            const item = getOrCreateMotivo(newMotivo)
+            item.valor += newDelta
+
+            const totalItem = getOrCreateTotal()
+            totalItem.valor += newDelta
+          }
+        }
+      }
+
+      // Salvar as alterações no Supabase e no estado React local
+      const updatedPoupancas = []
+      for (const p of currentPoupancas) {
+        if (p.id) {
+          const { data: updData, error } = await supabase
+            .from('poupancas')
+            .update({ valor: p.valor, motivo: p.motivo })
+            .eq('id', p.id)
+            .select()
+          if (error) throw error
+          if (updData && updData.length > 0) {
+            updatedPoupancas.push(updData[0])
+          } else {
+            updatedPoupancas.push(p)
+          }
+        } else {
+          const { data: insData, error } = await supabase
+            .from('poupancas')
+            .insert([{ motivo: p.motivo, valor: p.valor }])
+            .select()
+          if (error) throw error
+          if (insData && insData.length > 0) {
+            updatedPoupancas.push(insData[0])
+          } else {
+            updatedPoupancas.push(p)
+          }
+        }
+      }
+
+      setPoupancas(prev => {
+        const map = new Map(updatedPoupancas.map(p => [p.motivo.toLowerCase(), p]))
+        const merged = prev.map(p => {
+          const updated = map.get(p.motivo.toLowerCase())
+          if (updated) {
+            map.delete(p.motivo.toLowerCase())
+            return updated
+          }
+          return p
+        })
+        return [...merged, ...map.values()]
+      })
+    } catch (err) {
+      console.warn("Erro ao sincronizar poupança a partir de transações:", err.message)
     }
   }
 
@@ -1763,6 +1923,7 @@ export default function App() {
       case 'Dízimo': return '🙏';
       case 'Transporte': return '🚗';
       case 'Despesas Pessoais': return '👤';
+      case 'Dinheiro Guardado': return '💰';
       case 'Lazer': return '🍿';
       case 'Investimentos': return '📈';
       case 'Alimentação': return '🍲';
