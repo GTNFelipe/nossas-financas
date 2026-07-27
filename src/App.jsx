@@ -1545,9 +1545,6 @@ export default function App() {
   const quantoFalta = Math.max(0, metaReservaEmergencia - valorAtualReserva)
   const porcentagemReserva = metaReservaEmergencia > 0 ? Math.min(100, (valorAtualReserva / metaReservaEmergencia) * 100) : 0
 
-  // 3. Saldo do Mês
-  const saldoLiquido = totalReceita - totalDespesa
-
   // --- Cálculo de Faturamento Diário Necessário (Dias Úteis / Feriados) ---
   const getHolidaysForYear = (year) => {
     const holidays = [
@@ -1653,10 +1650,6 @@ export default function App() {
     return y === today.getFullYear() && m === (today.getMonth() + 1);
   };
 
-  const deficitAmount = Math.max(0, totalDespesa - totalReceita);
-  const dailyNeededTotal = totalBusinessDays > 0 ? deficitAmount / totalBusinessDays : 0;
-  const dailyNeededRemaining = remainingBusinessDays > 0 ? deficitAmount / remainingBusinessDays : 0;
-
   // 4. Dinheiro em Conta (Saldo Pago Acumulado de Todo o Histórico)
   const dinheiroEmConta = transactions
     .filter(t => t.status === 'Pago' && t.categoria !== 'Vale Alimentação/Refeição')
@@ -1667,6 +1660,13 @@ export default function App() {
         return sum - t.valor
       }
     }, 0)
+
+  // 3. Saldo Líquido (Dinheiro em Conta - Despesas do Mês)
+  const saldoLiquido = dinheiroEmConta - totalDespesa
+
+  const deficitAmount = Math.max(0, totalDespesa - dinheiroEmConta);
+  const dailyNeededTotal = totalBusinessDays > 0 ? deficitAmount / totalBusinessDays : 0;
+  const dailyNeededRemaining = remainingBusinessDays > 0 ? deficitAmount / remainingBusinessDays : 0;
 
   // Saldo em Carteira Individual
   const dinheiroEmContaFelipe = transactions
@@ -2373,7 +2373,8 @@ export default function App() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Saldo Líquido</p>
-                    <h3 className={`text-2xl font-bold mt-2 ${saldoLiquido >= 0
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Conta - Despesas do Mês</p>
+                    <h3 className={`text-2xl font-bold mt-1 ${saldoLiquido >= 0
                       ? 'text-green-600 dark:text-green-400'
                       : 'text-red-600 dark:text-red-400'
                       }`}>
