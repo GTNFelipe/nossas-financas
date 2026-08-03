@@ -1661,10 +1661,10 @@ export default function App() {
       }
     }, 0)
 
-  // 3. Saldo Líquido (Dinheiro em Conta - Despesas do Mês)
-  const saldoLiquido = dinheiroEmConta - totalDespesa
+  // 3. Saldo Líquido (Dinheiro em Conta - Despesas Pendentes do Mês)
+  const saldoLiquido = dinheiroEmConta - despesasPendentes
 
-  const deficitAmount = Math.max(0, totalDespesa - dinheiroEmConta);
+  const deficitAmount = Math.max(0, despesasPendentes - dinheiroEmConta);
   const dailyNeededTotal = totalBusinessDays > 0 ? deficitAmount / totalBusinessDays : 0;
   const dailyNeededRemaining = remainingBusinessDays > 0 ? deficitAmount / remainingBusinessDays : 0;
 
@@ -2373,7 +2373,7 @@ export default function App() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Saldo Líquido</p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Conta - Despesas do Mês</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Conta - Despesas Pendentes do Mês</p>
                     <h3 className={`text-2xl font-bold mt-1 ${saldoLiquido >= 0
                       ? 'text-green-600 dark:text-green-400'
                       : 'text-red-600 dark:text-red-400'
