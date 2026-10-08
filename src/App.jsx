@@ -22,7 +22,8 @@ import {
   ChevronDown,
   CreditCard,
   ArrowLeftRight,
-  X
+  X,
+  Download
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -263,6 +264,27 @@ export default function App() {
     getCategoryIcon
   } = useFinanceContext();
 
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen pb-12 transition-colors duration-300">
       {/* --- Header / Navbar --- */}
@@ -336,6 +358,17 @@ export default function App() {
             >
               <RefreshCw className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
             </button>
+            {/* Botão de Instalar PWA */}
+            {deferredPrompt && (
+              <button
+                onClick={handleInstallClick}
+                className="p-2.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:hover:bg-emerald-800/60 text-emerald-700 dark:text-emerald-300 transition-colors shadow-sm"
+                title="Instalar Aplicativo (PWA)"
+                aria-label="Instalar App"
+              >
+                <Download className="h-5 w-5 animate-bounce" />
+              </button>
+            )}
           </div>
         </div>
       </header>
