@@ -139,7 +139,7 @@ export function FinanceProvider({ children }) {
   }, [])
 
   const closeTransactionModal = () => {
-    closeTransactionModal()
+    setIsModalOpen(false)
     setEditingTransactionId(null)
     setEditingCCGroupMonth(null)
   }
