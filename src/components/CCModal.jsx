@@ -323,7 +323,7 @@ export default function CCModal() {
                                     onChange={(e) => setEditCCCategoria(e.target.value)}
                                     className="w-full bg-pink-50 dark:bg-slate-800 border border-pink-200 dark:border-slate-700 rounded-lg py-1 px-2 text-[11px] text-pink-900 dark:text-slate-200 font-bold outline-none cursor-pointer"
                                   >
-                                    {categoriasValidas.filter(c => c !== 'Transferência').map(c => (
+                                    {categoriasValidas.filter(c => c !== 'Transferência' && c !== 'Ajuste de Saldo').map(c => (
                                       <option key={c} value={c}>{c}</option>
                                     ))}
                                   </select>

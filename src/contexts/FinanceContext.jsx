@@ -83,6 +83,10 @@ export function FinanceProvider({ children }) {
 
   // --- Estados do Cartão de Crédito ---
   const [isCCModalOpen, setIsCCModalOpen] = useState(false)
+  // --- Estados de Regularização de Saldo em Conta ---
+  const [isRegularizarModalOpen, setIsRegularizarModalOpen] = useState(false)
+  const [regularizarConta, setRegularizarConta] = useState('Felipe')
+  const [regularizarNovoSaldo, setRegularizarNovoSaldo] = useState('')
   const [ccModalMonth, setCcModalMonth] = useState('')
   const [editingCCItemId, setEditingCCItemId] = useState(null)
   const [formCCDate, setFormCCDate] = useState(() => {
@@ -105,6 +109,7 @@ export function FinanceProvider({ children }) {
 
   // Categorias válidas fornecidas pelo usuário (em ordem alfabética)
   const categoriasValidas = [
+    'Ajuste de Saldo',
     'Alimentação',
     'Cartão de Crédito',
     'Casa',
@@ -1428,6 +1433,90 @@ export function FinanceProvider({ children }) {
     setIsTransferModalOpen(false)
   }
 
+  // --- Função para Abrir e Regularizar Saldo em Conta ---
+  const handleOpenRegularizarModal = (conta = 'Felipe') => {
+    setRegularizarConta(conta)
+    setRegularizarNovoSaldo('')
+    setIsRegularizarModalOpen(true)
+  }
+
+  const handleRegularizarSaldo = async ({ conta, novoSaldoNum }) => {
+    if (isNaN(novoSaldoNum)) {
+      alert("Por favor, digite um valor de saldo válido.")
+      return false
+    }
+
+    const currentSaldo = conta === 'Felipe' ? dinheiroEmContaFelipe : dinheiroEmContaThais
+    const diff = parseFloat((novoSaldoNum - currentSaldo).toFixed(2))
+
+    if (diff === 0) {
+      alert("O novo saldo informado é idêntico ao saldo atual do app. Nenhuma alteração é necessária.")
+      return false
+    }
+
+    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
+    if (isSupabaseConfigured && !isSupabaseActive) {
+      alert("Operação não permitida: O Supabase não está conectado.")
+      return false
+    }
+
+    const today = new Date()
+    const todayMonth = getTodayMonthStr()
+    let dataRef = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    if (selectedMonth !== todayMonth) {
+      dataRef = `${selectedMonth}-01`
+    }
+
+    const isAumento = diff > 0
+    const absDiff = Math.abs(diff)
+
+    const txAjuste = {
+      criado_em: new Date().toISOString(),
+      data_referencia: dataRef,
+      tipo: isAumento ? 'Receita' : 'Despesa',
+      categoria: 'Ajuste de Saldo',
+      subcategoria: `Regularização de Saldo em Conta (${isAumento ? '+' : '-'}${formatCurrency(absDiff)})`,
+      valor: absDiff,
+      quem_pagou: conta,
+      status: 'Pago'
+    }
+
+    setIsSyncing(true)
+    try {
+      if (isSupabaseActive) {
+        const { data, error } = await supabase
+          .from('transacoes')
+          .insert([txAjuste])
+          .select()
+
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          setTransactions(prev => [data[0], ...prev])
+        } else {
+          await loadData()
+        }
+      } else {
+        const localTx = {
+          ...txAjuste,
+          id: 'adj-' + Date.now()
+        }
+        setTransactions(prev => [localTx, ...prev])
+      }
+
+      setIsRegularizarModalOpen(false)
+      setRegularizarNovoSaldo('')
+      alert(`Saldo do(a) ${conta} regularizado com sucesso para ${formatCurrency(novoSaldoNum)}!`)
+      return true
+    } catch (err) {
+      console.error("Erro ao regularizar saldo no Supabase:", err.message)
+      alert("Erro ao salvar regularização no Supabase: " + err.message)
+      return false
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
 
   // --- Cálculos de Poupança (Guardar Dinheiro) ---
   const totalGuardadoItem = poupancas.find(p => p.motivo === 'Total')
@@ -1440,48 +1529,67 @@ export function FinanceProvider({ children }) {
   const activeMonthTransactions = transactions.filter(t => t.data_referencia.substring(0, 7) === selectedMonth)
   const activeMonthCashTransactions = activeMonthTransactions.filter(t => t.categoria !== 'Vale Alimentação/Refeição' && t.categoria !== 'Transferência')
 
-  // 1. Receita Total do Mês
+  // 1. Receita Total do Mês (ajustes de redução abatem da receita)
   const totalReceita = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Receita')
-    .reduce((sum, t) => sum + t.valor, 0)
+    .reduce((sum, t) => {
+      if (t.tipo === 'Receita') return sum + t.valor
+      if (t.tipo === 'Despesa' && t.categoria === 'Ajuste de Saldo') return sum - t.valor
+      return sum
+    }, 0)
 
   // Receitas detalhadas do mês
   const receitasPagas = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Receita' && t.status === 'Pago')
-    .reduce((sum, t) => sum + t.valor, 0)
+    .filter(t => t.status === 'Pago')
+    .reduce((sum, t) => {
+      if (t.tipo === 'Receita') return sum + t.valor
+      if (t.tipo === 'Despesa' && t.categoria === 'Ajuste de Saldo') return sum - t.valor
+      return sum
+    }, 0)
 
   const receitasPendentes = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Receita' && t.status === 'Pendente')
-    .reduce((sum, t) => sum + t.valor, 0)
+    .filter(t => t.status === 'Pendente')
+    .reduce((sum, t) => {
+      if (t.tipo === 'Receita') return sum + t.valor
+      if (t.tipo === 'Despesa' && t.categoria === 'Ajuste de Saldo') return sum - t.valor
+      return sum
+    }, 0)
 
   const receitasFelipe = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Receita' && t.quem_pagou === 'Felipe')
-    .reduce((sum, t) => sum + t.valor, 0)
+    .filter(t => t.quem_pagou === 'Felipe')
+    .reduce((sum, t) => {
+      if (t.tipo === 'Receita') return sum + t.valor
+      if (t.tipo === 'Despesa' && t.categoria === 'Ajuste de Saldo') return sum - t.valor
+      return sum
+    }, 0)
 
   const receitasThais = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Receita' && (t.quem_pagou === 'Thaís' || t.quem_pagou === 'Thais'))
-    .reduce((sum, t) => sum + t.valor, 0)
+    .filter(t => (t.quem_pagou === 'Thaís' || t.quem_pagou === 'Thais'))
+    .reduce((sum, t) => {
+      if (t.tipo === 'Receita') return sum + t.valor
+      if (t.tipo === 'Despesa' && t.categoria === 'Ajuste de Saldo') return sum - t.valor
+      return sum
+    }, 0)
 
-  const totalReceitasProporcao = receitasFelipe + receitasThais
-  const pctReceitaFelipe = totalReceitasProporcao > 0 ? (receitasFelipe / totalReceitasProporcao) * 100 : 50
+  const totalReceitasProporcao = Math.max(0, receitasFelipe) + Math.max(0, receitasThais)
+  const pctReceitaFelipe = totalReceitasProporcao > 0 ? (Math.max(0, receitasFelipe) / totalReceitasProporcao) * 100 : 50
   const showReceitaSplitBar = receitasFelipe > 0 && receitasThais > 0
 
-  // 2. Despesa Total do Mês
+  // 2. Despesa Total do Mês (exclui Ajuste de Saldo, que já afeta a Receita)
   const totalDespesa = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Despesa')
+    .filter(t => t.tipo === 'Despesa' && t.categoria !== 'Ajuste de Saldo')
     .reduce((sum, t) => sum + t.valor, 0)
 
   // Despesas detalhadas do mês
   const despesasPagas = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Despesa' && t.status === 'Pago')
+    .filter(t => t.tipo === 'Despesa' && t.status === 'Pago' && t.categoria !== 'Ajuste de Saldo')
     .reduce((sum, t) => sum + t.valor, 0)
 
   const despesasPendentes = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Despesa' && t.status === 'Pendente')
+    .filter(t => t.tipo === 'Despesa' && t.status === 'Pendente' && t.categoria !== 'Ajuste de Saldo')
     .reduce((sum, t) => sum + t.valor, 0)
 
   const despesasFelipe = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Despesa')
+    .filter(t => t.tipo === 'Despesa' && t.categoria !== 'Ajuste de Saldo')
     .reduce((sum, t) => {
       if (t.categoria === 'Cartão de Crédito') {
         return sum + (t.valor / 2)
@@ -1493,7 +1601,7 @@ export function FinanceProvider({ children }) {
     }, 0)
 
   const despesasThais = activeMonthCashTransactions
-    .filter(t => t.tipo === 'Despesa')
+    .filter(t => t.tipo === 'Despesa' && t.categoria !== 'Ajuste de Saldo')
     .reduce((sum, t) => {
       if (t.categoria === 'Cartão de Crédito') {
         return sum + (t.valor / 2)
@@ -1635,10 +1743,11 @@ export function FinanceProvider({ children }) {
       }
     }, 0)
 
-  // 3. Saldo Líquido (Dinheiro em Conta - Despesas Pendentes do Mês)
-  const saldoLiquido = dinheiroEmConta - despesasPendentes
+  // 3. Saldo Líquido (Receitas do Mês - Despesas do Mês)
+  // Regra de negócio: Saldo Líquido = Receita do Mês - Despesas (somente realizadas/pagas, pendentes não entram)
+  const saldoLiquido = receitasPagas - despesasPagas
 
-  const deficitAmount = Math.max(0, despesasPendentes - dinheiroEmConta);
+  const deficitAmount = Math.max(0, -saldoLiquido);
   const dailyNeededTotal = totalBusinessDays > 0 ? deficitAmount / totalBusinessDays : 0;
   const dailyNeededRemaining = remainingBusinessDays > 0 ? deficitAmount / remainingBusinessDays : 0;
 
@@ -1769,11 +1878,14 @@ export function FinanceProvider({ children }) {
   })
 
   const filteredReceitas = filteredTransactions
-    .filter(t => t.tipo === 'Receita')
-    .reduce((sum, t) => sum + t.valor, 0)
+    .reduce((sum, t) => {
+      if (t.tipo === 'Receita') return sum + t.valor
+      if (t.tipo === 'Despesa' && t.categoria === 'Ajuste de Saldo') return sum - t.valor
+      return sum
+    }, 0)
 
   const filteredDespesas = filteredTransactions
-    .filter(t => t.tipo === 'Despesa')
+    .filter(t => t.tipo === 'Despesa' && t.categoria !== 'Ajuste de Saldo')
     .reduce((sum, t) => sum + t.valor, 0)
 
   // Módulos de meses únicos para filtros
@@ -1803,6 +1915,8 @@ export function FinanceProvider({ children }) {
       if (monthsData[m]) {
         if (t.tipo === 'Receita') {
           monthsData[m].Receitas += t.valor
+        } else if (t.tipo === 'Despesa' && t.categoria === 'Ajuste de Saldo') {
+          monthsData[m].Receitas -= t.valor
         } else {
           monthsData[m].Despesas += t.valor
         }
@@ -1824,12 +1938,14 @@ export function FinanceProvider({ children }) {
       }
       if (t.tipo === 'Receita') {
         categoryMap[cat].Receitas += t.valor
+      } else if (t.tipo === 'Despesa' && t.categoria === 'Ajuste de Saldo') {
+        categoryMap[cat].Receitas -= t.valor
       } else if (t.tipo === 'Despesa') {
         categoryMap[cat].Despesas += t.valor
       }
     })
     // Retorna apenas categorias que tiveram movimento no mês atual
-    return Object.values(categoryMap).filter(item => item.Receitas > 0 || item.Despesas > 0)
+    return Object.values(categoryMap).filter(item => Math.abs(item.Receitas) > 0 || Math.abs(item.Despesas) > 0)
   }
 
   const categoryChartData = getCategoryChartData()
@@ -1913,6 +2029,7 @@ export function FinanceProvider({ children }) {
       case 'Vale Alimentação/Refeição': return '🍔';
       case 'Transferência': return '🔄';
       case 'Cartão de Crédito': return '💳';
+      case 'Ajuste de Saldo': return '⚖️';
       default: return '💰';
     }
   }
@@ -1989,6 +2106,14 @@ export function FinanceProvider({ children }) {
     setEditingPoupancaId,
     isTransferModalOpen,
     setIsTransferModalOpen,
+    isRegularizarModalOpen,
+    setIsRegularizarModalOpen,
+    regularizarConta,
+    setRegularizarConta,
+    regularizarNovoSaldo,
+    setRegularizarNovoSaldo,
+    handleOpenRegularizarModal,
+    handleRegularizarSaldo,
     formTransferValor,
     setFormTransferValor,
     formTransferDe,

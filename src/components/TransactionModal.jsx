@@ -156,7 +156,7 @@ export default function TransactionModal() {
                           onClick={() => setIsFormCategoriaDropdownOpen(false)}
                         />
                         <div className="absolute left-0 mt-2 w-full bg-pink-50/95 dark:bg-slate-900/95 backdrop-blur-md border border-pink-200 dark:border-amber-500/25 rounded-2xl shadow-xl py-1.5 z-30 max-h-60 overflow-y-auto animate-slide-up">
-                          {categoriasValidas.filter(c => c !== 'Transferência').map(c => {
+                          {categoriasValidas.filter(c => c !== 'Transferência' && c !== 'Ajuste de Saldo').map(c => {
                             const isSelected = c === formCategoria
                             return (
                               <button

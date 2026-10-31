@@ -42,6 +42,7 @@ import TransactionModal from './components/TransactionModal';
 import PoupancaModal from './components/PoupancaModal';
 import TransferModal from './components/TransferModal';
 import CCModal from './components/CCModal';
+import RegularizarSaldoModal from './components/RegularizarSaldoModal';
 import Dashboard from './components/Dashboard';
 import TransactionsList from './components/TransactionsList';
 import { supabase, isSupabaseConfigured } from './supabaseClient'
@@ -415,6 +416,7 @@ export default function App() {
       <PoupancaModal />
       <TransferModal />
       <CCModal />
+      <RegularizarSaldoModal />
 
     </div>
   )

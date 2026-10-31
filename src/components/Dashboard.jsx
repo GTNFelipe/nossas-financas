@@ -35,6 +35,7 @@ export default function Dashboard() {
     setFormSubcategoria,
     setFormPoupancaTotal,
     setIsTransferModalOpen,
+    handleOpenRegularizarModal,
     categoriasValidas,
     handleVRVARecharge,
     handleVRVARevert,
@@ -217,37 +218,57 @@ export default function Dashboard() {
                     <Check className="h-3 w-3 text-emerald-500" />
                     Saldo Líquido Pago
                   </div>
-                  <button
-                    onClick={() => setIsTransferModalOpen(true)}
-                    className="flex items-center gap-1 text-xs text-pink-600 hover:text-pink-700 dark:text-amber-400 dark:hover:text-amber-500 font-bold bg-pink-100 hover:bg-pink-200/60 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer active:scale-95"
-                    title="Transferir saldo entre contas"
-                  >
-                    <ArrowLeftRight className="h-3.5 w-3.5" />
-                    Transferir
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleOpenRegularizarModal('Felipe')}
+                      className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-bold bg-emerald-100/70 hover:bg-emerald-200/60 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40 border border-emerald-300/40 dark:border-emerald-500/30 px-2.5 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer active:scale-95"
+                      title="Regularizar dinheiro em conta com base no saldo real do banco"
+                    >
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      Regular
+                    </button>
+                    <button
+                      onClick={() => setIsTransferModalOpen(true)}
+                      className="flex items-center gap-1 text-xs text-pink-600 hover:text-pink-700 dark:text-amber-400 dark:hover:text-amber-500 font-bold bg-pink-100 hover:bg-pink-200/60 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer active:scale-95"
+                      title="Transferir saldo entre contas"
+                    >
+                      <ArrowLeftRight className="h-3.5 w-3.5" />
+                      Transferir
+                    </button>
+                  </div>
                 </div>
 
                 {/* Divisor e Saldos Individuais */}
                 <div className="mt-4 pt-3 border-t border-pink-200/50 dark:border-slate-800/80 space-y-2">
                   <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenRegularizarModal('Felipe')}
+                      className="flex items-center gap-1.5 text-left hover:opacity-80 transition-all cursor-pointer group"
+                      title="Clique para regularizar o saldo do Felipe"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-amber-500 flex-shrink-0 group-hover:scale-125 transition-transform"></span>
                       <div>
-                        <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-medium uppercase tracking-wider">Felipe</span>
+                        <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-medium uppercase tracking-wider">Felipe ✎</span>
                         <span className={`text-sm font-extrabold ${dinheiroEmContaFelipe >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>
                           {formatCurrency(dinheiroEmContaFelipe)}
                         </span>
                       </div>
-                    </div>
-                    <div className="flex items-center justify-end gap-1.5 text-right">
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenRegularizarModal('Thaís')}
+                      className="flex items-center justify-end gap-1.5 text-right hover:opacity-80 transition-all cursor-pointer group"
+                      title="Clique para regularizar o saldo da Thaís"
+                    >
                       <div>
-                        <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-medium uppercase tracking-wider">Thaís</span>
+                        <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-medium uppercase tracking-wider">Thaís ✎</span>
                         <span className={`text-sm font-extrabold ${dinheiroEmContaThais >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>
                           {formatCurrency(dinheiroEmContaThais)}
                         </span>
                       </div>
-                      <span className="h-2 w-2 rounded-full bg-pink-500 flex-shrink-0"></span>
-                    </div>
+                      <span className="h-2 w-2 rounded-full bg-pink-500 flex-shrink-0 group-hover:scale-125 transition-transform"></span>
+                    </button>
                   </div>
 
                   {/* Barra de Proporção do Saldo */}
@@ -421,7 +442,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Saldo Líquido</p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Conta - Despesas Pendentes do Mês</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Receitas Pagas - Despesas Pagas</p>
                     <h3 className={`text-2xl font-bold mt-1 ${saldoLiquido >= 0
                       ? 'text-green-600 dark:text-green-400'
                       : 'text-red-600 dark:text-red-400'
