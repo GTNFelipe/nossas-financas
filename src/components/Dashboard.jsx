@@ -1,5 +1,5 @@
 import {
-  Wallet, TrendingUp, TrendingDown, Clock, Target, CreditCard, Plus, Check, ChevronDown, SlidersHorizontal, ArrowLeftRight, RefreshCw, Info, Edit, Trash2, Copy, Calendar, DollarSign
+  Wallet, TrendingUp, TrendingDown, Clock, Target, CreditCard, Plus, Check, ChevronDown, SlidersHorizontal, RefreshCw, Info, Edit, Trash2, Copy, Calendar, DollarSign
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
@@ -218,24 +218,14 @@ export default function Dashboard() {
                     <Check className="h-3 w-3 text-emerald-500" />
                     Saldo Líquido Pago
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleOpenRegularizarModal('Felipe')}
-                      className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-bold bg-emerald-100/70 hover:bg-emerald-200/60 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40 border border-emerald-300/40 dark:border-emerald-500/30 px-2.5 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer active:scale-95"
-                      title="Regularizar dinheiro em conta com base no saldo real do banco"
-                    >
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
-                      Regular
-                    </button>
-                    <button
-                      onClick={() => setIsTransferModalOpen(true)}
-                      className="flex items-center gap-1 text-xs text-pink-600 hover:text-pink-700 dark:text-amber-400 dark:hover:text-amber-500 font-bold bg-pink-100 hover:bg-pink-200/60 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer active:scale-95"
-                      title="Transferir saldo entre contas"
-                    >
-                      <ArrowLeftRight className="h-3.5 w-3.5" />
-                      Transferir
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleOpenRegularizarModal('Felipe')}
+                    className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-bold bg-emerald-100/70 hover:bg-emerald-200/60 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40 border border-emerald-300/40 dark:border-emerald-500/30 px-2.5 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer active:scale-95"
+                    title="Regularizar dinheiro em conta com base no saldo real do banco"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Regular
+                  </button>
                 </div>
 
                 {/* Divisor e Saldos Individuais */}
