@@ -432,7 +432,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Saldo Líquido</p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Receitas Pagas - Despesas Pagas</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Receitas - Despesas do Mês</p>
                     <h3 className={`text-2xl font-bold mt-1 ${saldoLiquido >= 0
                       ? 'text-green-600 dark:text-green-400'
                       : 'text-red-600 dark:text-red-400'

@@ -1744,8 +1744,8 @@ export function FinanceProvider({ children }) {
     }, 0)
 
   // 3. Saldo Líquido (Receitas do Mês - Despesas do Mês)
-  // Regra de negócio: Saldo Líquido = Receita do Mês - Despesas (somente realizadas/pagas, pendentes não entram)
-  const saldoLiquido = receitasPagas - despesasPagas
+  // Regra de negócio: Saldo Líquido = Receita Total do Mês - Despesa Total do Mês (sem mais nem menos)
+  const saldoLiquido = totalReceita - totalDespesa
 
   const deficitAmount = Math.max(0, -saldoLiquido);
   const dailyNeededTotal = totalBusinessDays > 0 ? deficitAmount / totalBusinessDays : 0;
