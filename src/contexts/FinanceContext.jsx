@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { supabase, isSupabaseConfigured } from '../supabaseClient';
 import { initialTransactions, initialPoupanca } from '../mockData';
 
@@ -96,6 +96,23 @@ export function FinanceProvider({ children }) {
   const [formCCSubcategory, setFormCCSubcategory] = useState('')
   const [formCCValor, setFormCCValor] = useState('')
   const [formCCRecorrencia, setFormCCRecorrencia] = useState(1)
+
+  // --- Estados de Apelidos dos Cartões de Crédito ---
+  const [cardNicknames, setCardNicknames] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nossas_financas_cc_nicknames')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch (e) {
+      console.warn("Erro ao ler apelidos de cartão do localStorage:", e)
+    }
+    return ['Nubank', 'Inter', 'XP']
+  })
+  const [formCCCard, setFormCCCard] = useState('Nubank')
+  const [editCCCard, setEditCCCard] = useState('Nubank')
+  const [isManageCardsOpen, setIsManageCardsOpen] = useState(false)
 
   const [editCCDate, setEditCCDate] = useState('')
   const [editCCSubcategory, setEditCCSubcategory] = useState('')
@@ -667,19 +684,22 @@ export function FinanceProvider({ children }) {
   const handleDeleteTransaction = async (id) => {
     if (!window.confirm("Deseja realmente excluir esta transação?")) return
 
-    if (!isSupabaseConfigured || dbStatus !== 'supabase_connected') {
+    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
+    if (isSupabaseConfigured && !isSupabaseActive) {
       alert("Operação não permitida: O Supabase não está conectado.")
       return
     }
 
     setIsSyncing(true)
     try {
-      const { error } = await supabase
-        .from('transacoes')
-        .delete()
-        .eq('id', id)
+      if (isSupabaseActive) {
+        const { error } = await supabase
+          .from('transacoes')
+          .delete()
+          .eq('id', id)
 
-      if (error) throw error
+        if (error) throw error
+      }
 
       const tx = transactions.find(t => t.id === id)
       if (tx && (tx.categoria === 'Guardar Dinheiro' || tx.categoria === 'Dinheiro Guardado')) {
@@ -689,17 +709,89 @@ export function FinanceProvider({ children }) {
       // Delete linked dízimo in Supabase
       const refString = `[Ref: ${id}]`
       const linkedDizimo = transactions.find(t => t.categoria === 'Dízimo' && t.tipo === 'Despesa' && t.subcategoria.includes(refString))
-      if (linkedDizimo) {
+      if (linkedDizimo && isSupabaseActive) {
         await supabase.from('transacoes').delete().eq('id', linkedDizimo.id)
       }
 
       setTransactions(prev => prev.filter(t => t.id !== id && (!linkedDizimo || t.id !== linkedDizimo.id)))
     } catch (err) {
-      console.error("Erro ao excluir do Supabase:", err.message)
-      alert("Erro ao excluir do Supabase: " + err.message)
+      console.error("Erro ao excluir:", err.message)
+      alert("Erro ao excluir: " + err.message)
     } finally {
       setIsSyncing(false)
     }
+  }
+
+  // --- Funções Auxiliares para Apelidos de Cartões de Crédito ---
+  const extractCardNickname = (subcategoria) => {
+    if (!subcategoria || typeof subcategoria !== 'string') return null
+    const match = subcategoria.match(/\[(.*?)\]/)
+    if (match && !match[1].startsWith('Ref:')) {
+      return match[1].trim()
+    }
+    return null
+  }
+
+  const cleanSubcategoryDescription = (subcategoria) => {
+    if (!subcategoria || typeof subcategoria !== 'string') return ''
+    return subcategoria
+      .replace(/\[(?!Ref:).*?\]/g, '')
+      .replace(/\s*\(\d+\/\d+\)/g, '')
+      .trim()
+  }
+
+  const formatSubcategoryWithCard = (baseDesc, cardNickname, currentParcela = 1, totalParcelas = 1) => {
+    const cleanBase = cleanSubcategoryDescription(baseDesc) || 'Compra Cartão'
+    const cardPart = cardNickname && cardNickname.trim() ? ` [${cardNickname.trim()}]` : ''
+    const parcelaPart = totalParcelas > 1 ? ` (${currentParcela}/${totalParcelas})` : ''
+    return `${cleanBase}${cardPart}${parcelaPart}`
+  }
+
+  // Lista dinâmica de todos os apelidos de cartões (cadastrados + encontrados nas transações)
+  const allAvailableCards = useMemo(() => {
+    const cardsSet = new Set(cardNicknames)
+    transactions.forEach(t => {
+      if (t.categoria === 'Cartão de Crédito') {
+        const nick = extractCardNickname(t.subcategoria)
+        if (nick) cardsSet.add(nick)
+      }
+    })
+    return Array.from(cardsSet)
+  }, [cardNicknames, transactions])
+
+  const addCardNickname = (name) => {
+    const trimmed = name?.trim()
+    if (!trimmed) return false
+    if (allAvailableCards.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      alert("Este cartão já está cadastrado!")
+      return false
+    }
+    const updated = [...cardNicknames, trimmed]
+    setCardNicknames(updated)
+    try {
+      localStorage.setItem('nossas_financas_cc_nicknames', JSON.stringify(updated))
+    } catch (e) {
+      console.warn("Erro ao salvar cartões:", e)
+    }
+    return true
+  }
+
+  const removeCardNickname = (name) => {
+    if (allAvailableCards.length <= 1) {
+      alert("Você deve manter pelo menos um cartão cadastrado.")
+      return false
+    }
+    const updated = cardNicknames.filter(c => c !== name)
+    setCardNicknames(updated)
+    try {
+      localStorage.setItem('nossas_financas_cc_nicknames', JSON.stringify(updated))
+    } catch (e) {
+      console.warn("Erro ao salvar cartões:", e)
+    }
+    if (formCCCard === name) {
+      setFormCCCard(updated[0] || 'Nubank')
+    }
+    return true
   }
 
   const handleOpenCCModal = (month) => {
@@ -714,6 +806,9 @@ export function FinanceProvider({ children }) {
     setFormCCSubcategory('')
     setFormCCValor('')
     setFormCCRecorrencia(1)
+    if (allAvailableCards.length > 0 && !allAvailableCards.includes(formCCCard)) {
+      setFormCCCard(allAvailableCards[0])
+    }
 
     setEditingCCItemId(null)
     setIsCCModalOpen(true)
@@ -815,9 +910,11 @@ export function FinanceProvider({ children }) {
       return
     }
 
-    const subcategoriaCapitalized = capitalizeWords(formCCSubcategory.trim()) || 'Compra Cartão'
+    const subcategoriaCapitalized = capitalizeWords(cleanSubcategoryDescription(formCCSubcategory)) || 'Compra Cartão'
+    const cardToUse = formCCCard || allAvailableCards[0] || 'Nubank'
 
-    if (!isSupabaseConfigured || dbStatus !== 'supabase_connected') {
+    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
+    if (isSupabaseConfigured && !isSupabaseActive) {
       alert("Operação não permitida: O Supabase não está conectado.")
       return
     }
@@ -827,9 +924,7 @@ export function FinanceProvider({ children }) {
 
     for (let i = 0; i < numRecorrencias; i++) {
       const dateRef = addMonths(formCCDate, i)
-      const subcat = numRecorrencias > 1
-        ? `${subcategoriaCapitalized} (${i + 1}/${numRecorrencias})`
-        : subcategoriaCapitalized
+      const subcat = formatSubcategoryWithCard(subcategoriaCapitalized, cardToUse, i + 1, numRecorrencias)
 
       txsToInsert.push({
         criado_em: new Date().toISOString(),
@@ -845,17 +940,25 @@ export function FinanceProvider({ children }) {
 
     setIsSyncing(true)
     try {
-      const { data, error } = await supabase
-        .from('transacoes')
-        .insert(txsToInsert)
-        .select()
+      if (isSupabaseActive) {
+        const { data, error } = await supabase
+          .from('transacoes')
+          .insert(txsToInsert)
+          .select()
 
-      if (error) throw error
+        if (error) throw error
 
-      if (data && data.length > 0) {
-        setTransactions(prev => [...data, ...prev])
+        if (data && data.length > 0) {
+          setTransactions(prev => [...data, ...prev])
+        } else {
+          loadData()
+        }
       } else {
-        loadData()
+        const localTxs = txsToInsert.map((tx, idx) => ({
+          ...tx,
+          id: Date.now() + idx
+        }))
+        setTransactions(prev => [...localTxs, ...prev])
       }
 
       // Reset form fields
@@ -866,7 +969,7 @@ export function FinanceProvider({ children }) {
 
     } catch (err) {
       console.error("Erro ao adicionar item no cartão:", err.message)
-      alert("Erro ao salvar no Supabase: " + err.message)
+      alert("Erro ao salvar: " + err.message)
     } finally {
       setIsSyncing(false)
     }
@@ -880,12 +983,14 @@ export function FinanceProvider({ children }) {
     setEditCCCategoria(item.categoria)
     setEditCCQuemPagou(item.quem_pagou === 'Thaís' || item.quem_pagou === 'Thais' ? 'Thaís' : 'Felipe')
 
-    const match = item.subcategoria.match(/(.*?)\s*\((\d+)\/(\d+)\)/)
+    const card = extractCardNickname(item.subcategoria)
+    setEditCCCard(card || allAvailableCards[0] || 'Nubank')
+    setEditCCSubcategory(cleanSubcategoryDescription(item.subcategoria))
+
+    const match = item.subcategoria.match(/\((\d+)\/(\d+)\)/)
     if (match) {
-      setEditCCSubcategory(match[1].trim())
-      setEditCCRecorrencia(parseInt(match[3], 10))
+      setEditCCRecorrencia(parseInt(match[2], 10))
     } else {
-      setEditCCSubcategory(item.subcategoria)
       setEditCCRecorrencia(1)
     }
   }
@@ -905,9 +1010,11 @@ export function FinanceProvider({ children }) {
       return
     }
 
-    const subcategoriaCapitalized = capitalizeWords(editCCSubcategory.trim()) || 'Compra Cartão'
+    const subcategoriaCapitalized = capitalizeWords(cleanSubcategoryDescription(editCCSubcategory)) || 'Compra Cartão'
+    const cardToUse = editCCCard || allAvailableCards[0] || 'Nubank'
 
-    if (!isSupabaseConfigured || dbStatus !== 'supabase_connected') {
+    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
+    if (isSupabaseConfigured && !isSupabaseActive) {
       alert("Operação não permitida: O Supabase não está conectado.")
       return
     }
@@ -920,7 +1027,7 @@ export function FinanceProvider({ children }) {
 
       if (originalMatch) {
         const cleanOrig = originalMatch[1].trim()
-        const pattern = new RegExp("^" + escapeRegExp(cleanOrig) + "\\s*\\(\\d+/\\d+\\)$")
+        const pattern = new RegExp("^" + escapeRegExp(cleanOrig) + "\s*\(\d+/\d+\)$")
 
         const siblingTxs = transactions.filter(t =>
           t.categoria === 'Cartão de Crédito' &&
@@ -931,25 +1038,25 @@ export function FinanceProvider({ children }) {
 
         if (siblingTxs.length > 0) {
           deletedSiblingIds = siblingTxs.map(t => t.id)
-          const { error: deleteError } = await supabase
-            .from('transacoes')
-            .delete()
-            .in('id', deletedSiblingIds)
+          if (isSupabaseActive) {
+            const { error: deleteError } = await supabase
+              .from('transacoes')
+              .delete()
+              .in('id', deletedSiblingIds)
 
-          if (deleteError) throw deleteError
+            if (deleteError) throw deleteError
+          }
         }
       }
 
       // 2. Gerar as novas futuras parcelas se editCCRecorrencia > 1
       const editCCRecorrenciaNum = parseInt(editCCRecorrencia, 10) || 1
-      const finalSubcat = editCCRecorrenciaNum > 1
-        ? `${subcategoriaCapitalized} (1/${editCCRecorrenciaNum})`
-        : subcategoriaCapitalized
+      const finalSubcat = formatSubcategoryWithCard(subcategoriaCapitalized, cardToUse, 1, editCCRecorrenciaNum)
 
       const extraTxsToInsert = []
       for (let i = 1; i < editCCRecorrenciaNum; i++) {
         const dateRef = addMonths(editCCDate, i)
-        const subcat = `${subcategoriaCapitalized} (${i + 1}/${editCCRecorrenciaNum})`
+        const subcat = formatSubcategoryWithCard(subcategoriaCapitalized, cardToUse, i + 1, editCCRecorrenciaNum)
         extraTxsToInsert.push({
           criado_em: new Date().toISOString(),
           data_referencia: dateRef,
@@ -972,57 +1079,70 @@ export function FinanceProvider({ children }) {
         quem_pagou: editCCQuemPagou
       }
 
-      const { data: updateData, error: updateError } = await supabase
-        .from('transacoes')
-        .update(updatedFields)
-        .eq('id', id)
-        .select()
-
-      if (updateError) throw updateError
-
-      let insertedData = []
-      if (extraTxsToInsert.length > 0) {
-        const { data: insData, error: insError } = await supabase
+      if (isSupabaseActive) {
+        const { data: updateData, error: updateError } = await supabase
           .from('transacoes')
-          .insert(extraTxsToInsert)
+          .update(updatedFields)
+          .eq('id', id)
           .select()
-        if (insError) throw insError
-        insertedData = insData || []
-      }
 
-      if (updateData && updateData.length > 0) {
+        if (updateError) throw updateError
+
+        let insertedData = []
+        if (extraTxsToInsert.length > 0) {
+          const { data: insData, error: insError } = await supabase
+            .from('transacoes')
+            .insert(extraTxsToInsert)
+            .select()
+          if (insError) throw insError
+          insertedData = insData || []
+        }
+
+        if (updateData && updateData.length > 0) {
+          setTransactions(prev => {
+            let filtered = prev.filter(t => !deletedSiblingIds.includes(t.id))
+            filtered = filtered.map(t => t.id === id ? updateData[0] : t)
+            return [...insertedData, ...filtered]
+          })
+        } else {
+          loadData()
+        }
+      } else {
+        const localUpdated = { ...item, ...updatedFields }
+        const localExtras = extraTxsToInsert.map((t, idx) => ({ ...t, id: Date.now() + idx }))
         setTransactions(prev => {
           let filtered = prev.filter(t => !deletedSiblingIds.includes(t.id))
-          filtered = filtered.map(t => t.id === id ? updateData[0] : t)
-          return [...insertedData, ...filtered]
+          filtered = filtered.map(t => t.id === id ? localUpdated : t)
+          return [...localExtras, ...filtered]
         })
-      } else {
-        loadData()
       }
 
       setEditingCCItemId(null)
     } catch (err) {
       console.error("Erro ao editar item no cartão:", err.message)
-      alert("Erro ao salvar no Supabase: " + err.message)
+      alert("Erro ao salvar: " + err.message)
     } finally {
       setIsSyncing(false)
     }
   }
 
   const toggleCCItemStatus = async (item) => {
-    if (!isSupabaseConfigured || dbStatus !== 'supabase_connected') {
+    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
+    if (isSupabaseConfigured && !isSupabaseActive) {
       alert("Operação não permitida: O Supabase não está conectado.")
       return
     }
     const newStatus = item.status === 'Pago' ? 'Pendente' : 'Pago'
     setIsSyncing(true)
     try {
-      const { error } = await supabase
-        .from('transacoes')
-        .update({ status: newStatus })
-        .eq('id', item.id)
+      if (isSupabaseActive) {
+        const { error } = await supabase
+          .from('transacoes')
+          .update({ status: newStatus })
+          .eq('id', item.id)
 
-      if (error) throw error
+        if (error) throw error
+      }
 
       setTransactions(prev => prev.map(t => t.id === item.id ? { ...t, status: newStatus } : t))
     } catch (err) {
@@ -2156,6 +2276,20 @@ export function FinanceProvider({ children }) {
     setFormCCQuemPagou,
     editingCCGroupMonth,
     setEditingCCGroupMonth,
+    cardNicknames,
+    setCardNicknames,
+    allAvailableCards,
+    addCardNickname,
+    removeCardNickname,
+    formCCCard,
+    setFormCCCard,
+    editCCCard,
+    setEditCCCard,
+    isManageCardsOpen,
+    setIsManageCardsOpen,
+    extractCardNickname,
+    cleanSubcategoryDescription,
+    formatSubcategoryWithCard,
     categoriasValidas,
     checkMonthTurn,
     handleVRVARecharge,
