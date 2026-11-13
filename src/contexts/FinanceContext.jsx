@@ -2,6 +2,27 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { supabase, isSupabaseConfigured } from '../supabaseClient';
 import { initialTransactions, initialPoupanca } from '../mockData';
+import {
+  capitalizeWords,
+  escapeRegExp,
+  parseBRL,
+  formatCurrency,
+  formatDate,
+  formatCCModalMonthName,
+  getTodayMonthStr,
+  cleanMotivo,
+  getCategoryIcon
+} from '../utils/formatters';
+import {
+  extractCardNickname,
+  cleanSubcategoryDescription,
+  formatSubcategoryWithCard
+} from '../utils/creditCardHelpers';
+import {
+  addMonths,
+  getHolidaysForYear,
+  getBusinessDaysInfo
+} from '../utils/dateHelpers';
 
 const FinanceContext = createContext();
 
@@ -29,10 +50,6 @@ export function FinanceProvider({ children }) {
   const [categoryChartType, setCategoryChartType] = useState('Despesa') // 'Despesa' | 'Receita'
 
   // --- Estados de Filtro ---
-  const getTodayMonthStr = () => {
-    const today = new Date()
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-  }
   const [selectedMonth, setSelectedMonth] = useState(getTodayMonthStr)
   const [filterPerson, setFilterPerson] = useState('Todos')
   const [filterType, setFilterType] = useState('Todos')
@@ -311,29 +328,6 @@ export function FinanceProvider({ children }) {
     setFormDataReferencia(`${yyyy}-${mm}-${dd}`)
     setFormRecorrencia(1)
     setIsModalOpen(true)
-  }
-
-  // Helper robusto para adicionar meses a uma data YYYY-MM-DD
-  const addMonths = (dateStr, monthsToAdd) => {
-    if (!dateStr) return dateStr
-    const parts = dateStr.split('-')
-    if (parts.length !== 3) return dateStr
-    const year = parseInt(parts[0], 10)
-    const month = parseInt(parts[1], 10)
-    const day = parseInt(parts[2], 10)
-
-    // Cria data no dia 1 do mês de destino para evitar transbordamento automático
-    const date = new Date(year, month - 1 + monthsToAdd, 1)
-
-    // Obtém o número máximo de dias do mês de destino
-    const maxDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
-    const targetDay = Math.min(day, maxDay)
-    date.setDate(targetDay)
-
-    const y = date.getFullYear()
-    const m = String(date.getMonth() + 1).padStart(2, '0')
-    const d = String(date.getDate()).padStart(2, '0')
-    return `${y}-${m}-${d}`
   }
 
   // --- Função para Adicionar ou Editar Transação ---
@@ -652,31 +646,6 @@ export function FinanceProvider({ children }) {
     }
   }
 
-  // --- Funções Auxiliares para Apelidos de Cartões de Crédito ---
-  const extractCardNickname = (subcategoria) => {
-    if (!subcategoria || typeof subcategoria !== 'string') return null
-    const match = subcategoria.match(/\[(.*?)\]/)
-    if (match && !match[1].startsWith('Ref:')) {
-      return match[1].trim()
-    }
-    return null
-  }
-
-  const cleanSubcategoryDescription = (subcategoria) => {
-    if (!subcategoria || typeof subcategoria !== 'string') return ''
-    return subcategoria
-      .replace(/\[(?!Ref:).*?\]/g, '')
-      .replace(/\s*\(\d+\/\d+\)/g, '')
-      .trim()
-  }
-
-  const formatSubcategoryWithCard = (baseDesc, cardNickname, currentParcela = 1, totalParcelas = 1) => {
-    const cleanBase = cleanSubcategoryDescription(baseDesc) || 'Compra Cartão'
-    const cardPart = cardNickname && cardNickname.trim() ? ` [${cardNickname.trim()}]` : ''
-    const parcelaPart = totalParcelas > 1 ? ` (${currentParcela}/${totalParcelas})` : ''
-    return `${cleanBase}${cardPart}${parcelaPart}`
-  }
-
   // Lista dinâmica de todos os apelidos de cartões (cadastrados + encontrados nas transações)
   const allAvailableCards = useMemo(() => {
     const cardsSet = new Set(cardNicknames)
@@ -957,7 +926,7 @@ export function FinanceProvider({ children }) {
 
       if (originalMatch) {
         const cleanOrig = originalMatch[1].trim()
-        const pattern = new RegExp("^" + escapeRegExp(cleanOrig) + "\s*\(\d+/\d+\)$")
+        const pattern = new RegExp("^" + escapeRegExp(cleanOrig) + "\\s*\\(\\d+/\\d+\\)$")
 
         const siblingTxs = transactions.filter(t =>
           t.categoria === 'Cartão de Crédito' &&
@@ -1081,19 +1050,6 @@ export function FinanceProvider({ children }) {
     } finally {
       setIsSyncing(false)
     }
-  }
-
-  const formatCCModalMonthName = (monthStr) => {
-    if (!monthStr) return ''
-    const parts = monthStr.split('-')
-    if (parts.length < 2) return monthStr
-    const [year, month] = parts
-    const months = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ]
-    const idx = parseInt(month, 10) - 1
-    return idx >= 0 && idx < 12 ? `${months[idx]} de ${year}` : monthStr
   }
 
   // --- Função para Alternar Status da Transação (Pago/Pendente) ---
@@ -1667,10 +1623,6 @@ export function FinanceProvider({ children }) {
   const showDespesaSplitBar = despesasFelipe > 0 && despesasThais > 0
 
   // Reserva de Emergência Inteligência
-  const cleanMotivo = (name) => {
-    if (!name) return ''
-    return name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-  }
   const reservaEmergenciaItem = motivosPoupanca.find(p => cleanMotivo(p.motivo) === 'reserva de emergencia')
   const valorAtualReserva = reservaEmergenciaItem ? reservaEmergenciaItem.valor : 0
   const metaReservaEmergencia = totalDespesa * 6
@@ -1678,102 +1630,6 @@ export function FinanceProvider({ children }) {
   const porcentagemReserva = metaReservaEmergencia > 0 ? Math.min(100, (valorAtualReserva / metaReservaEmergencia) * 100) : 0
 
   // --- Cálculo de Faturamento Diário Necessário (Dias Úteis / Feriados) ---
-  const getHolidaysForYear = (year) => {
-    const holidays = [
-      `${year}-01-01`, // Confraternização Universal
-      `${year}-01-20`, // São Sebastião (Rio de Janeiro)
-      `${year}-01-25`, // Aniversário de São Paulo
-      `${year}-04-21`, // Tiradentes
-      `${year}-04-23`, // São Jorge (Rio de Janeiro)
-      `${year}-05-01`, // Dia do Trabalho
-      `${year}-07-09`, // Revolução Constitucionalista (São Paulo)
-      `${year}-09-07`, // Independência
-      `${year}-10-12`, // Nossa Senhora Aparecida
-      `${year}-11-02`, // Finados
-      `${year}-11-15`, // Proclamação da República
-      `${year}-11-20`, // Consciência Negra
-      `${year}-12-25`  // Natal
-    ];
-
-    const a = year % 19;
-    const b = Math.floor(year / 100);
-    const c = year % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const easterMonth = Math.floor((h + l - 7 * m + 114) / 31) - 1;
-    const easterDay = ((h + l - 7 * m + 114) % 31) + 1;
-    const easter = new Date(year, easterMonth, easterDay);
-
-    const formatDate = (date) => {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    };
-
-    const sextaSanta = new Date(easter);
-    sextaSanta.setDate(easter.getDate() - 2);
-    holidays.push(formatDate(sextaSanta));
-
-    const carnavalTerca = new Date(easter);
-    carnavalTerca.setDate(easter.getDate() - 47);
-    holidays.push(formatDate(carnavalTerca));
-
-    const corpusChristi = new Date(easter);
-    corpusChristi.setDate(easter.getDate() + 60);
-    holidays.push(formatDate(corpusChristi));
-
-    return holidays;
-  };
-
-  const getBusinessDaysInfo = (monthStr) => {
-    if (!monthStr) return { total: 0, remaining: 0 };
-    const parts = monthStr.split('-');
-    if (parts.length !== 2) return { total: 0, remaining: 0 };
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1; // 0-indexed
-
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const yearHolidays = getHolidaysForYear(year);
-
-    let total = 0;
-    let remaining = 0;
-
-    const today = new Date();
-    const todayYear = today.getFullYear();
-    const todayMonth = today.getMonth();
-    const todayDate = today.getDate();
-
-    for (let d = 1; d <= daysInMonth; d++) {
-      const currentDate = new Date(year, month, d);
-      const dayOfWeek = currentDate.getDay();
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const isHoliday = yearHolidays.includes(dateStr);
-
-      if (!isWeekend && !isHoliday) {
-        total++;
-        if (year === todayYear && month === todayMonth) {
-          if (d >= todayDate) {
-            remaining++;
-          }
-        } else if (year > todayYear || (year === todayYear && month > todayMonth)) {
-          remaining++;
-        }
-      }
-    }
-
-    return { total, remaining };
-  };
-
   const { total: totalBusinessDays, remaining: remainingBusinessDays } = getBusinessDaysInfo(selectedMonth);
   const isMonthCurrent = () => {
     if (!selectedMonth) return false;
@@ -1848,21 +1704,6 @@ export function FinanceProvider({ children }) {
   }
 
   const freeMoneyData = getFreeMoneyData()
-
-  // Formatação de Data DD/MM/AAAA
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const [year, month, day] = parts;
-      return `${day}/${month}/${year}`;
-    }
-    if (parts.length === 2) {
-      const [year, month] = parts;
-      return `01/${month}/${year}`;
-    }
-    return dateStr;
-  }
 
   // --- Filtragem de Transações para a Tabela com Cartão de Crédito Consolidado ---
   const activeMonthNonCCTxs = activeMonthTransactions.filter(t => t.categoria !== 'Cartão de Crédito')
@@ -2004,67 +1845,6 @@ export function FinanceProvider({ children }) {
     '#6366f1', // Indigo
     '#f97316'  // Laranja
   ]
-
-  // Função para capitalizar a primeira letra de cada palavra e manter o resto em minúsculo
-  const capitalizeWords = (str) => {
-    if (!str) return ''
-    return str
-      .split(' ')
-      .map(word => {
-        if (word.length === 0) return ''
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-      })
-      .join(' ')
-  }
-
-  const escapeRegExp = (string) => {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  }
-
-  // Função para converter strings formatadas em pt-BR (ex: "1.234,56" ou "1234,56") para número (float)
-  const parseBRL = (valueString) => {
-    if (valueString === null || valueString === undefined) return 0;
-    if (typeof valueString === 'number') return valueString;
-    // Remove pontos de milhares e converte vírgula decimal para ponto
-    const limpo = valueString.toString().replace(/\./g, '').replace(',', '.');
-    return parseFloat(limpo) || 0;
-  }
-
-  // Formatação de Dinheiro em R$
-  const formatCurrency = (val) => {
-    const num = typeof val === 'string' ? parseFloat(val) || 0 : val;
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(num || 0)
-  }
-
-  // Mapear ícones das categorias
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'Casa': return '🏠';
-      case 'Saúde': return '🩺';
-      case 'Dízimo': return '🙏';
-      case 'Transporte': return '🚗';
-      case 'Despesas Pessoais': return '👤';
-      case 'Dinheiro Guardado':
-      case 'Guardar Dinheiro': return '🏦';
-      case 'Lazer': return '🍿';
-      case 'Investimentos': return '📈';
-      case 'Alimentação': return '🍲';
-      case 'Educação': return '📚';
-      case 'Imprevistos': return '⚠️';
-      case 'Salário': return '💵';
-      case 'Renda Extra': return '💸';
-      case 'Vale Alimentação/Refeição': return '🍔';
-      case 'Transferência': return '🔄';
-      case 'Cartão de Crédito': return '💳';
-      case 'Ajuste de Saldo': return '⚖️';
-      default: return '💰';
-    }
-  }
-
-
 
   const value = {
     transactions,

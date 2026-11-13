@@ -48,13 +48,10 @@ export default function CCModal() {
     formatCurrency,
     getCategoryIcon,
     allAvailableCards,
-    addCardNickname,
-    removeCardNickname,
     formCCCard,
     setFormCCCard,
     editCCCard,
     setEditCCCard,
-    isManageCardsOpen,
     setIsManageCardsOpen,
     extractCardNickname,
     cleanSubcategoryDescription

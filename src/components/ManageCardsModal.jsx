@@ -9,7 +9,6 @@ export default function ManageCardsModal() {
     allAvailableCards,
     addCardNickname,
     removeCardNickname,
-    formCCCard,
     setFormCCCard,
     transactions,
     ccModalMonth,

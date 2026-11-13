@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   SlidersHorizontal, Check, TrendingUp, TrendingDown, Info, RefreshCw
 } from 'lucide-react';
@@ -14,7 +13,6 @@ export default function RegularizarSaldoModal() {
     setRegularizarNovoSaldo,
     dinheiroEmContaFelipe,
     dinheiroEmContaThais,
-    dinheiroEmConta,
     formatCurrency,
     parseBRL,
     handleRegularizarSaldo,
@@ -26,7 +24,6 @@ export default function RegularizarSaldoModal() {
   const hasValidInput = !isNaN(novoSaldoNum);
   const diff = hasValidInput ? parseFloat((novoSaldoNum - currentSaldo).toFixed(2)) : 0;
   const isAumento = diff > 0;
-  const isReducao = diff < 0;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

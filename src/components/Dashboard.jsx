@@ -1,5 +1,5 @@
 import {
-  Wallet, TrendingUp, TrendingDown, Clock, Target, CreditCard, Plus, Check, ChevronDown, SlidersHorizontal, RefreshCw, Info, Edit, Trash2, Copy, Calendar, DollarSign
+  Wallet, TrendingUp, TrendingDown, Clock, Target, Plus, Check, ChevronDown, SlidersHorizontal, Info, Edit, Trash2, Copy, Calendar, DollarSign
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
@@ -8,7 +8,6 @@ import { useFinanceContext } from '../contexts/FinanceContext';
 
 export default function Dashboard() {
   const {
-    transactions,
     setIsPoupancaModalOpen,
     theme,
     activeTab,
@@ -34,7 +33,6 @@ export default function Dashboard() {
     setFormValor,
     setFormSubcategoria,
     setFormPoupancaTotal,
-    setIsTransferModalOpen,
     handleOpenRegularizarModal,
     categoriasValidas,
     startEditTransaction,
