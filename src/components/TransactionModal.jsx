@@ -1,5 +1,5 @@
 import {
-  ChevronDown
+  ChevronDown, CreditCard, Settings
 } from 'lucide-react';
 import { useFinanceContext } from '../contexts/FinanceContext';
 
@@ -33,6 +33,10 @@ export default function TransactionModal() {
     editingCCGroupMonth,
     categoriasValidas,
     handleSaveTransaction,
+    allAvailableCards,
+    formCCCard,
+    setFormCCCard,
+    setIsManageCardsOpen,
     capitalizeWords,
     getCategoryIcon
   } = useFinanceContext();
@@ -204,6 +208,42 @@ export default function TransactionModal() {
                       }`}
                   />
                 </div>
+
+                {/* Seleção do Cartão de Crédito (Apelido) */}
+                {formCategoria === 'Cartão de Crédito' && !editingCCGroupMonth && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <CreditCard className="h-3.5 w-3.5 text-pink-600 dark:text-amber-400" />
+                        <span>Cartão de Crédito (Apelido)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsManageCardsOpen(true)}
+                        className="text-[11px] font-bold text-pink-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Settings className="h-3 w-3" />
+                        <span>Gerenciar Cartões</span>
+                      </button>
+                    </div>
+                    <select
+                      value={formCCCard}
+                      onChange={(e) => {
+                        if (e.target.value === '__NEW__') {
+                          setIsManageCardsOpen(true);
+                        } else {
+                          setFormCCCard(e.target.value);
+                        }
+                      }}
+                      className="w-full bg-pink-50 dark:bg-slate-800 border border-pink-200 dark:border-slate-700 text-pink-900 dark:text-white rounded-xl py-2.5 px-3 text-sm font-semibold outline-none focus:border-pink-500 dark:focus:border-amber-500 focus:ring-2 focus:ring-pink-500/20 dark:focus:ring-amber-500/20 cursor-pointer"
+                    >
+                      {allAvailableCards.map(c => (
+                        <option key={c} value={c}>💳 {c}</option>
+                      ))}
+                      <option value="__NEW__">+ Cadastrar Novo Cartão...</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Quem Pagou, Data Referência e Recorrência */}

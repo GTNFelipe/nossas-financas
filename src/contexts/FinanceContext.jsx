@@ -355,7 +355,13 @@ export function FinanceProvider({ children }) {
     setFormValor(Number(tx.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
     setFormTipo(tx.tipo)
     setFormCategoria(tx.categoria)
-    setFormSubcategoria(tx.subcategoria)
+    if (tx.categoria === 'Cartão de Crédito') {
+      const card = extractCardNickname(tx.subcategoria)
+      if (card) setFormCCCard(card)
+      setFormSubcategoria(cleanSubcategoryDescription(tx.subcategoria))
+    } else {
+      setFormSubcategoria(tx.subcategoria)
+    }
     setFormQuemPagou(tx.quem_pagou)
     setFormStatus(tx.status)
     setFormDataReferencia(tx.data_referencia)
@@ -371,6 +377,9 @@ export function FinanceProvider({ children }) {
     setFormCategoria(tx.categoria)
     setFormSubcategoria(tx.subcategoria)
     if (tx.categoria === 'Cartão de Crédito') {
+      const card = extractCardNickname(tx.subcategoria)
+      if (card) setFormCCCard(card)
+      setFormSubcategoria(cleanSubcategoryDescription(tx.subcategoria))
       setFormQuemPagou(tx.quem_pagou === 'Thaís' || tx.quem_pagou === 'Thais' ? 'Thaís' : 'Felipe')
       setFormStatus('Pendente')
     } else {
@@ -460,7 +469,11 @@ export function FinanceProvider({ children }) {
       return
     }
 
-    const subcategoriaCapitalized = capitalizeWords(formSubcategoria.trim()) || 'Outros'
+    let subcategoriaCapitalized = capitalizeWords(cleanSubcategoryDescription(formSubcategoria)) || 'Outros'
+    if (formCategoria === 'Cartão de Crédito' && !editingCCGroupMonth) {
+      const cardToUse = formCCCard || allAvailableCards[0] || 'Nubank'
+      subcategoriaCapitalized = `${subcategoriaCapitalized} [${cardToUse}]`
+    }
     const dbQuemPagou = formQuemPagou
 
     if (editingTransactionId) {
@@ -519,18 +532,18 @@ export function FinanceProvider({ children }) {
         if (updateData && updateData.length > 0) {
           const updatedTx = updateData[0];
 
-          // Sync Dízimo in Supabase
-          const isRendaExtra = updatedTx.categoria === 'Renda Extra' && updatedTx.tipo === 'Receita';
+          // Sync Dízimo in Supabase (10% tanto para Renda Extra quanto para Salário)
+          const isEligibleForDizimo = (updatedTx.categoria === 'Renda Extra' || updatedTx.categoria === 'Salário') && updatedTx.tipo === 'Receita';
           const refString = `[Ref: ${editingTransactionId}]`;
           const existingDizimo = transactions.find(t => t.categoria === 'Dízimo' && t.tipo === 'Despesa' && t.subcategoria.includes(refString));
 
           let finalDizimo = null;
-          if (isRendaExtra) {
+          if (isEligibleForDizimo) {
             const targetDizimo = {
               data_referencia: updatedTx.data_referencia,
               tipo: 'Despesa',
               categoria: 'Dízimo',
-              subcategoria: `Dízimo 10% - Renda Extra (${formatDate(updatedTx.data_referencia)}) ${refString}`,
+              subcategoria: `Dízimo 10% - ${updatedTx.categoria} (${formatDate(updatedTx.data_referencia)}) ${refString}`,
               valor: updatedTx.valor * 0.1,
               quem_pagou: updatedTx.quem_pagou,
               status: updatedTx.status
@@ -572,12 +585,12 @@ export function FinanceProvider({ children }) {
           setTransactions(prev => {
             let updatedList = prev.map(t => t.id === editingTransactionId ? updatedTx : t);
             if (existingDizimo) {
-              if (isRendaExtra && finalDizimo) {
+              if (isEligibleForDizimo && finalDizimo) {
                 updatedList = updatedList.map(t => t.id === existingDizimo.id ? finalDizimo : t);
-              } else if (!isRendaExtra) {
+              } else if (!isEligibleForDizimo) {
                 updatedList = updatedList.filter(t => t.id !== existingDizimo.id);
               }
-            } else if (isRendaExtra && finalDizimo) {
+            } else if (isEligibleForDizimo && finalDizimo) {
               updatedList = [finalDizimo, ...updatedList];
             }
             return [...insertedData, ...updatedList];
@@ -629,15 +642,15 @@ export function FinanceProvider({ children }) {
             await handleSyncPoupancaFromTxs(savedMoneyTxs, 'insert')
           }
 
-          // Generate dizimo for Supabase
+          // Generate dizimo for Supabase (10% tanto para Renda Extra quanto para Salário)
           const dizimoTxs = data
-            .filter(t => t.categoria === 'Renda Extra' && t.tipo === 'Receita')
+            .filter(t => (t.categoria === 'Renda Extra' || t.categoria === 'Salário') && t.tipo === 'Receita')
             .map(t => ({
               criado_em: new Date().toISOString(),
               data_referencia: t.data_referencia,
               tipo: 'Despesa',
               categoria: 'Dízimo',
-              subcategoria: `Dízimo 10% - Renda Extra (${formatDate(t.data_referencia)}) [Ref: ${t.id}]`,
+              subcategoria: `Dízimo 10% - ${t.categoria} (${formatDate(t.data_referencia)}) [Ref: ${t.id}]`,
               valor: t.valor * 0.1,
               quem_pagou: t.quem_pagou,
               status: t.status
