@@ -142,7 +142,6 @@ export function FinanceProvider({ children }) {
     'Saúde',
     'Transferência',
     'Transporte',
-    'Vale Alimentação/Refeição',
   ]
 
   useEffect(() => {
@@ -213,88 +212,6 @@ export function FinanceProvider({ children }) {
     }
 
     sessionStorage.setItem('financas_last_checked_month', todayStr)
-  }
-
-  // Função para realizar a recarga manual do Vale Alimentação/Refeição Flexível (R$ 1.004,00)
-  const handleVRVARecharge = async (month) => {
-    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
-    
-    if (isSupabaseConfigured && !isSupabaseActive) {
-      alert("Operação não permitida: O Supabase não está conectado.")
-      return
-    }
-
-    const rechargeData = {
-      criado_em: new Date().toISOString(),
-      data_referencia: `${month}-01`,
-      tipo: 'Receita',
-      categoria: 'Vale Alimentação/Refeição',
-      subcategoria: 'Recarga Mensal',
-      valor: 1004.00,
-      quem_pagou: 'Felipe',
-      status: 'Pago'
-    }
-
-    setIsSyncing(true)
-    try {
-      if (isSupabaseActive) {
-        const { data, error } = await supabase
-          .from('transacoes')
-          .insert([rechargeData])
-          .select()
-
-        if (error) throw error
-        if (data && data.length > 0) {
-          setTransactions(prev => [data[0], ...prev])
-        }
-      } else {
-        const localRecharge = {
-          ...rechargeData,
-          id: Date.now()
-        }
-        setTransactions(prev => [localRecharge, ...prev])
-      }
-    } catch (err) {
-      console.error("Erro ao inserir recarga no Supabase:", err.message)
-      alert("Erro ao inserir recarga no Supabase: " + err.message)
-    } finally {
-      setIsSyncing(false)
-    }
-  }
-
-  // Função para reverter/remover a recarga do Vale Alimentação/Refeição Flexível
-  const handleVRVARevert = async (month) => {
-    const rechargeTx = transactions.find(t =>
-      t.categoria === 'Vale Alimentação/Refeição' &&
-      t.tipo === 'Receita' &&
-      t.data_referencia.substring(0, 7) === month
-    )
-
-    if (!rechargeTx) return
-
-    const isSupabaseActive = dbStatus === 'supabase_connected' && isSupabaseConfigured
-    if (isSupabaseConfigured && !isSupabaseActive) {
-      alert("Operação não permitida: O Supabase não está conectado.")
-      return
-    }
-
-    setIsSyncing(true)
-    try {
-      if (isSupabaseActive) {
-        const { error } = await supabase
-          .from('transacoes')
-          .delete()
-          .eq('id', rechargeTx.id)
-
-        if (error) throw error
-      }
-      setTransactions(prev => prev.filter(t => t.id !== rechargeTx.id))
-    } catch (err) {
-      console.error("Erro ao reverter recarga no Supabase:", err.message)
-      alert("Erro ao reverter recarga no Supabase: " + err.message)
-    } finally {
-      setIsSyncing(false)
-    }
   }
 
   // Sincronizar dados locais se o Supabase não estiver ativo
@@ -1916,26 +1833,6 @@ export function FinanceProvider({ children }) {
 
   const dinheiroLivre = Math.max(0, dinheiroEmConta - totalDespesasPendentes)
 
-  // --- Cálculos do Vale Alimentação/Refeição Flexível (VA/VR) ---
-  const activeMonthVRVATxs = activeMonthTransactions.filter(t => t.categoria === 'Vale Alimentação/Refeição')
-  const cargaVRVA = activeMonthVRVATxs
-    .filter(t => t.tipo === 'Receita')
-    .reduce((sum, t) => sum + t.valor, 0)
-  const gastoVRVA = activeMonthVRVATxs
-    .filter(t => t.tipo === 'Despesa')
-    .reduce((sum, t) => sum + t.valor, 0)
-
-  // Saldo Restante Flexível cumulativo de todo o histórico até o mês selecionado
-  const cumulativeCargaVRVA = transactions
-    .filter(t => t.categoria === 'Vale Alimentação/Refeição' && t.tipo === 'Receita' && t.data_referencia.substring(0, 7) <= selectedMonth)
-    .reduce((sum, t) => sum + t.valor, 0)
-  const cumulativeGastoVRVA = transactions
-    .filter(t => t.categoria === 'Vale Alimentação/Refeição' && t.tipo === 'Despesa' && t.data_referencia.substring(0, 7) <= selectedMonth)
-    .reduce((sum, t) => sum + t.valor, 0)
-  const saldoRestanteVRVA = cumulativeCargaVRVA - cumulativeGastoVRVA
-
-  const pctVRVA = cargaVRVA > 0 ? (gastoVRVA / cargaVRVA) * 100 : 0
-
   const getFreeMoneyData = () => {
     if (dinheiroEmConta >= totalDespesasPendentes) {
       return [
@@ -2305,8 +2202,6 @@ export function FinanceProvider({ children }) {
     formatSubcategoryWithCard,
     categoriasValidas,
     checkMonthTurn,
-    handleVRVARecharge,
-    handleVRVARevert,
     loadLocalData,
     loadData,
     startEditTransaction,
@@ -2375,13 +2270,6 @@ export function FinanceProvider({ children }) {
     pctFelipe,
     totalDespesasPendentes,
     dinheiroLivre,
-    activeMonthVRVATxs,
-    cargaVRVA,
-    gastoVRVA,
-    cumulativeCargaVRVA,
-    cumulativeGastoVRVA,
-    saldoRestanteVRVA,
-    pctVRVA,
     getFreeMoneyData,
     freeMoneyData,
     formatDate,

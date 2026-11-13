@@ -37,8 +37,6 @@ export default function Dashboard() {
     setIsTransferModalOpen,
     handleOpenRegularizarModal,
     categoriasValidas,
-    handleVRVARecharge,
-    handleVRVARevert,
     startEditTransaction,
     startDuplicateTransaction,
     handleDeleteTransaction,
@@ -83,10 +81,6 @@ export default function Dashboard() {
     pctFelipe,
     totalDespesasPendentes,
     dinheiroLivre,
-    cargaVRVA,
-    gastoVRVA,
-    saldoRestanteVRVA,
-    pctVRVA,
     freeMoneyData,
     formatDate,
     filteredTransactions,
@@ -783,8 +777,8 @@ export default function Dashboard() {
 
             </div>
 
-            {/* --- Novo Layout: Dinheiro Livre, Vale Alimentação/Refeição e Progresso das Metas --- */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* --- Disponibilidade de Saldo --- */}
+            <div className="grid grid-cols-1 gap-6">
 
               {/* Card de Dinheiro Livre (Donut Chart) */}
               <div className="glass-panel p-6 flex flex-col justify-between">
@@ -875,85 +869,6 @@ export default function Dashboard() {
                 <div className="mt-6 border-t border-pink-200 dark:border-amber-500/20 pt-4 flex justify-between items-center text-xs">
                   <span className="text-slate-500 dark:text-slate-400 font-medium">Saldo Total em Conta:</span>
                   <span className="font-bold text-slate-800 dark:text-slate-300">{formatCurrency(dinheiroEmConta)}</span>
-                </div>
-              </div>
-
-              {/* Card de Vale Alimentação/Refeição Flexível (VA/VR) */}
-              <div className="glass-panel p-6 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Alimentação & Refeição</h3>
-                    <div className="p-2.5 bg-pink-100 dark:bg-orange-950/30 rounded-xl text-pink-600 dark:text-orange-400 shadow-inner">
-                      <CreditCard className="h-4.5 w-4.5" />
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <span className="text-xs font-semibold text-slate-500">Saldo Restante Flexível</span>
-                    <h4 className={`text-3xl font-black mt-1 tracking-tight ${saldoRestanteVRVA >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>
-                      {formatCurrency(saldoRestanteVRVA)}
-                    </h4>
-                  </div>
-
-                  {/* Detalhes do Benefício */}
-                  <div className="space-y-4">
-                    {/* Barra de Progresso Gasto */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-slate-700 dark:text-slate-300">Uso do Limite Mensal</span>
-                        <span className="text-slate-500">{pctVRVA.toFixed(0)}%</span>
-                      </div>
-                      <div className="w-full bg-pink-50 dark:bg-orange-950/20 h-2.5 rounded-full overflow-hidden border border-pink-100/50 dark:border-orange-900/10">
-                        <div
-                          className="h-full bg-gradient-to-r from-pink-400 to-pink-600 dark:from-orange-400 dark:to-orange-600 transition-all duration-550"
-                          style={{ width: `${Math.min(100, pctVRVA)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    {/* Info Geral de Gasto vs Recarga */}
-                    <div className="grid grid-cols-2 gap-2 pt-2">
-                      <div className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/20 dark:border-slate-800/20">
-                        <span className="text-[10px] text-slate-500 block">Recarregado</span>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatCurrency(cargaVRVA)}</span>
-                      </div>
-                      <div className="p-3 bg-pink-100/10 dark:bg-slate-900/50 rounded-xl border border-pink-200/20 dark:border-slate-800/20">
-                        <span className="text-[10px] text-slate-500 block">Gasto Realizado</span>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatCurrency(gastoVRVA)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 border-t border-pink-200 dark:border-amber-500/20 pt-4 flex justify-between items-center text-xs gap-2">
-                  {transactions.some(t =>
-                    t.categoria === 'Vale Alimentação/Refeição' &&
-                    t.tipo === 'Receita' &&
-                    t.data_referencia.substring(0, 7) === selectedMonth
-                  ) ? (
-                    <>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                        <Check className="h-3.5 w-3.5" /> Recarregado
-                      </span>
-                      <button
-                        onClick={() => handleVRVARevert(selectedMonth)}
-                        className="px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-medium transition-colors cursor-pointer border border-rose-200/50 dark:border-rose-900/30 active:scale-95"
-                        title="Reverter a recarga deste mês"
-                      >
-                        Reverter Recarga
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-slate-500 dark:text-slate-400 font-medium">Pendente de recarga:</span>
-                      <button
-                        onClick={() => handleVRVARecharge(selectedMonth)}
-                        className="px-3 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600 dark:text-slate-950 font-bold transition-all shadow-xs shadow-pink-200 cursor-pointer flex items-center gap-1 active:scale-95"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" /> Recarregar R$ 1.004
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
 
